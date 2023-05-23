@@ -1,13 +1,13 @@
 cradle:
   stack:
     - path: "./lib"
-      component: "report:lib"
+      component: "lambda-calculus:lib"
 
     - path: "./exec/Main.lhs"
-      component: "report:exe:myprogram"
+      component: "lambda-calculus:exe:myprogram"
 
-    - path: "./exec/Paths_report.hs"
-      component: "report:exe:myprogram"
+    - path: "./exec/Paths_lambda-calculus.hs"
+      component: "lambda-calculus:exe:myprogram"
 
     - path: "./test"
-      component: "report:test:simpletests"
+      component: "lambda-calculus:test:lambda_tests"

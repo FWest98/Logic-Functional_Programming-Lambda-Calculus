@@ -1,0 +1,62 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.35.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           lambda-calculus
+version:        0.1.0.0
+synopsis:       Lambda Calculus implementation in Haskell
+description:    See the report
+category:       Logic
+maintainer:     Floris Westerman
+build-type:     Simple
+
+library
+  exposed-modules:
+      Basics
+      Lambda
+      LambdaTerms
+  other-modules:
+      Paths_lambda_calculus
+  hs-source-dirs:
+      lib
+  ghc-options: -Wall
+  build-depends:
+      QuickCheck
+    , base
+    , containers
+    , random
+  default-language: Haskell2010
+
+executable myprogram
+  main-is: Main.lhs
+  other-modules:
+      Paths_lambda_calculus
+  hs-source-dirs:
+      exec
+  ghc-options: -Wall
+  build-depends:
+      QuickCheck
+    , base
+    , containers
+    , lambda-calculus
+    , random
+  default-language: Haskell2010
+
+test-suite lambda_tests
+  type: exitcode-stdio-1.0
+  main-is: lambda_tests.lhs
+  other-modules:
+      Paths_lambda_calculus
+  hs-source-dirs:
+      test
+  ghc-options: -Wall
+  build-depends:
+      QuickCheck
+    , base
+    , containers
+    , hspec
+    , lambda-calculus
+    , random
+  default-language: Haskell2010

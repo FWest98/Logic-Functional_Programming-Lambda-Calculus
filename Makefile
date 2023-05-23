@@ -1,10 +1,6 @@
-
 .PHONY: all build run test clean
 
-all: report.pdf build
-
-report.pdf: *.tex lib/*.lhs test/*.lhs exec/*.lhs references.bib
-	latexmk -pdf -synctex=1 -interaction=nonstopmode report
+all: build
 
 build:
 	stack build

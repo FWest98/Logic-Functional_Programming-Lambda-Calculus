@@ -8,6 +8,7 @@ We will now use the library form Section \ref{sec:Basics} in a program.
 module Main where
 
 import Basics
+import Lambda
 
 main :: IO ()
 main = do

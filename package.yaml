@@ -1,8 +1,8 @@
-name: report
+name: lambda-calculus
 version: 0.1.0.0
-synopsis: My Haskell project
-description: See report.pdf
-maintainer: My Name <my.email@example.com>
+synopsis: Lambda Calculus implementation in Haskell
+description: See the report
+maintainer: Floris Westerman
 category: Logic
 
 ghc-options: -Wall
@@ -11,6 +11,7 @@ dependencies:
   - base
   - random
   - QuickCheck
+  - containers
 
 library:
   source-dirs: lib
@@ -20,13 +21,14 @@ executables:
     main: Main.lhs
     source-dirs: exec
     dependencies:
-      - report
+      - lambda-calculus
 
 tests:
-  simpletests:
-    main: simpletests.lhs
+  lambda_tests:
+    main: lambda_tests.lhs
     source-dirs: test
     dependencies:
-      - report
+      - lambda-calculus
       - QuickCheck
       - hspec
+      - containers
