@@ -21,7 +21,7 @@ more readable than {Λ "x" (Λ "y" (App (Var "x") (Var "y")))}.
 -- Define module, list exports
 module Lambda (
     Λ,
-    λ, v, (-->), (#), ($$),
+    λ, (-->), ($$),
     ppΛ, showΛ,
     freeVariables, substitute,
     isNormalForm, βReductions, normalForm, (===)
@@ -48,22 +48,35 @@ instance Eq Λ where
   x == y = αEquiv x y []
 
 -- Helper functions for notation
-λ :: Variable -> Λ -> Λ
-λ = Λ
+class ΛParams a where
+  toΛparams :: [Variable] -> a
 
-v :: Variable -> Λ
-v = Var
+instance ΛParams (Λ -> Λ) where
+  toΛparams [] = error "No Λ parameters supplied"
+  toΛparams [x] = Λ x
+  toΛparams (x:xs) = Λ x . toΛparams xs
 
-(-->) :: (Λ -> Λ) -> Λ -> Λ
-(-->) = ($)
+instance (ΛParams a) => ΛParams (Variable -> a) where
+  toΛparams xs x = toΛparams (xs ++ [x])
+
+λ :: ΛParams a => a
+λ = toΛparams []
+
+class Λable a where
+  toΛ :: a -> Λ
+
+instance Λable Λ where
+  toΛ = id
+
+instance Λable String where
+  toΛ = Var
+
+(-->) :: Λable a => (Λ -> Λ) -> a -> Λ
+a --> b = a (toΛ b)
 infixr 6 -->
 
-(#) :: (Λ -> Λ) -> Variable -> (Λ -> Λ)
-x # y = x . Λ y
-infixl 7 #
-
-($$) :: Λ -> Λ -> Λ
-x $$ y = App x y
+($$) :: (Λable a, Λable b) => a -> b -> Λ
+x $$ y = App (toΛ x) (toΛ y)
 infixl 7 $$
 
 -- Pretty printing
