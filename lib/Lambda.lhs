@@ -40,7 +40,12 @@ type EquivalenceContext = [(Variable, Variable)]
 
 αEquiv :: Λ -> Λ -> EquivalenceContext -> Bool
 αEquiv (Var x) (Var y) context = x == y || (x, y) `elem` context
-αEquiv (Λ x xTerm) (Λ y yTerm) context = αEquiv xTerm yTerm ((x, y) : context)
+αEquiv (Λ x xTerm) (Λ y yTerm) context = canSubstitute && αEquiv xTerm yTerm ((x, y) : context)
+  where
+    yInXTerm = y `elem` freeVariables xTerm
+    xInYTerm = x `elem` freeVariables yTerm
+    canSubstitute = not yInXTerm && not xInYTerm
+
 αEquiv (App x1 x2) (App y1 y2) context = αEquiv x1 y1 context && αEquiv x2 y2 context
 αEquiv _ _ _ = False
 
@@ -65,11 +70,8 @@ instance (ΛParams a) => ΛParams (Variable -> a) where
 class Λable a where
   toΛ :: a -> Λ
 
-instance Λable Λ where
-  toΛ = id
-
-instance Λable String where
-  toΛ = Var
+instance Λable Λ where toΛ = id
+instance Λable String where toΛ = Var
 
 (-->) :: Λable a => (Λ -> Λ) -> a -> Λ
 a --> b = a (toΛ b)
@@ -84,10 +86,10 @@ ppΛ :: Λ -> String
 ppΛ (Var x) = x
 ppΛ (Λ x term@(Λ _ _)) = "λ" ++ x ++ tail (ppΛ term)
 ppΛ (Λ x term) = "λ" ++ x ++ "." ++ ppΛ term
-ppΛ (App x@(Λ _ _) y@(Λ _ _)) = "(" ++ ppΛ x ++ ")(" ++ ppΛ y ++ ")"
-ppΛ (App x@(Λ _ _) y) = "(" ++ ppΛ x ++ ")" ++ ppΛ y
-ppΛ (App x y@(Λ _ _)) = ppΛ x ++ "(" ++ ppΛ y ++ ")"
-ppΛ (App x y) = ppΛ x ++ ppΛ y
+ppΛ (App x@(Λ _ _) y@(Var _)) = "(" ++ ppΛ x ++ ")" ++ ppΛ y
+ppΛ (App x@(Λ _ _) y) = "(" ++ ppΛ x ++ ")(" ++ ppΛ y ++ ")"
+ppΛ (App x y@(Var _)) = ppΛ x ++ ppΛ y
+ppΛ (App x y) = ppΛ x ++ "(" ++ ppΛ y ++ ")"
 
 showΛ :: Λ -> IO ()
 showΛ = putStrLn . ppΛ
@@ -122,11 +124,11 @@ isNormalForm = not . hasβRedex
 βReductions :: Λ -> [Λ]
 βReductions (App (Λ x term) n) = [substitute term x n] ++ reduceTerm ++ reduceApp
     where
-        reduceTerm = map (\newTerm -> App (Λ x newTerm) n) $ βReductions term
-        reduceApp = map (App (Λ x term)) $ βReductions n
+        reduceTerm = (\newTerm -> App (Λ x newTerm) n) <$> βReductions term
+        reduceApp = App (Λ x term) <$> βReductions n
 βReductions (Var _) = []
-βReductions (Λ x term) = map (Λ x) $ βReductions term
-βReductions (App x y) = map (`App` y) (βReductions x) ++ map (App x) (βReductions y)
+βReductions (Λ x term) = Λ x <$> βReductions term
+βReductions (App x y) = ((`App` y) <$> βReductions x) ++ (App x <$> βReductions y)
 
 -- Performing only the leftmost redex to try and find the normal form - if it exists
 βReduceLeft :: Λ -> Λ
