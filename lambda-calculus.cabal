@@ -17,6 +17,7 @@ library
       Basics
       Lambda
       LambdaTerms
+      TypedLambda
   other-modules:
       Paths_lambda_calculus
   hs-source-dirs:
