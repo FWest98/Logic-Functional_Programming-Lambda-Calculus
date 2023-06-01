@@ -1,9 +1,10 @@
 \begin{code}
 
 module TypedLambda (
-    ΛT, LambdaT,
+    ΛT, LambdaT, Type,
     λT, lT, (-->), ($$), (==>), TypeableVariable((:::)),
-    prettyΛT, prettyLambdaT, prettyType, showΛT, showLambdaT, showType, showTypeΛT, showTypeLambdaT,
+    prettyΛT, prettyLambdaT, prettyType,
+    showΛT, showLambdaT, showType, showTypeΛT, showTypeLambdaT,
     freeVariables, substitute,
     isNormalForm, βReductions, betaReductions, normalForm, (===)
 ) where
@@ -36,7 +37,7 @@ type EquivalenceContext = [(VariableName, VariableName)]
   where
     xInYterm = y `elem` freeVariables xTerm
     yInXterm = x `elem` freeVariables yTerm
-    canSubstitute = not yInXterm && not xInYterm
+    canSubstitute = x == y || (not yInXterm && not xInYterm)
 
 αEquiv (App x1 x2) (App y1 y2) context = αEquiv x1 y1 context && αEquiv x2 y2 context
 αEquiv _ _ _ = False
@@ -62,13 +63,13 @@ instance (ΛTParams a) => ΛTParams (TypeableVariable -> a) where
 lT = λT
 λT = toΛTparams []
 
-class Typable a where
+class Typeable a where
   toType :: a -> Type
 
-instance Typable Type where toType = id
-instance Typable VariableName where toType = Pure
+instance Typeable Type where toType = id
+instance Typeable String where toType = Pure
 
-(==>) :: (Typable a, Typable b) => a -> b -> Type
+(==>) :: (Typeable a, Typeable b) => a -> b -> Type
 a ==> b = toType a :-> toType b
 infixr 7 ==>
 
@@ -80,7 +81,7 @@ instance ΛTable VariableName where toΛT s = Var (s :-: Null)
 instance ΛTable TypeableVariable where toΛT = Var . toVariable
 
 (-->) :: ΛTable a => (ΛT -> ΛT) -> a -> ΛT
-a --> b = a (toΛT b)
+a --> b = deduceTypes (a (toΛT b)) mempty
 infixr 5 -->
 
 ($$) :: (ΛTable a, ΛTable b) => a -> b -> ΛT
@@ -88,7 +89,7 @@ x $$ y = App (toΛT x) (toΛT y)
 infixl 6 $$
 
 data TypeableVariable where
-  (:::) :: Typable a => VariableName -> a -> TypeableVariable
+  (:::) :: Typeable a => VariableName -> a -> TypeableVariable
 infixl 6 :::
 
 toVariable :: TypeableVariable -> Variable
