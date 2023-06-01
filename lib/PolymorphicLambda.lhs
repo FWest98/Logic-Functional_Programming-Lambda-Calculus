@@ -14,10 +14,11 @@ module PolymorphicLambda (
 ) where
 
 -- Imports
-import Data.Set (Set, delete, singleton, union, empty, toList, insert, filter)
+import Data.Set (Set, delete, singleton, union, empty, toList, insert, filter, intersection)
 import Control.Monad
 import Data.Maybe
 import Debug.Trace (trace)
+import Data.Foldable (foldrM)
 
 type VariableName = String
 data PType = Pure VariableName | PType :-> PType | Forall VariableName PType | Perp | Null | Type
@@ -174,8 +175,14 @@ showTypeΛP, showTypeLambdaP :: ΛP -> IO ()
 showTypeLambdaP = showTypeΛP
 showTypeΛP t = putStrLn $ maybe "Impossible type" prettyPType (typeOf t)
 
+boundVariables :: ΛP -> Set VariableName
+boundVariables (Var _) = empty
+boundVariables (ΛP (x :-: _) _) = singleton x
+boundVariables (ΛPT x _) = singleton x
+boundVariables (App _ _) = empty
+
 freeVariables :: ΛP -> Set VariableName
-freeVariables (Var (x :-: t)) = singleton x `union` freeTypeVariables t
+freeVariables (Var (x :-: t)) = insert x $ freeTypeVariables t
 freeVariables (ΛP (x :-: _) term) = delete x $ freeVariables term
 freeVariables (ΛPT x term) = delete x $ freeVariables term
 freeVariables (App x y) = freeVariables x `union` freeVariables y
@@ -248,17 +255,51 @@ deduceTypes (App xTerm (Var (x :-: Null))) types
 
 deduceTypes (App x y) types = App (deduceTypes x types) (deduceTypes y types)
 
+makeTypeSafeFor :: PType -> VariableName -> PType
+makeTypeSafeFor (x :-> y) var = makeTypeSafeFor x var :-> makeTypeSafeFor y var
+makeTypeSafeFor (Forall p t) var
+ | p /= var = Forall p $ makeTypeSafeFor t var
+ | otherwise = Forall newName $ makeTypeSafeFor (replaceNameInType t p newName) var
+ where newName = "_" ++ var
+makeTypeSafeFor t _ = t
+
+makeSafeFor :: ΛP -> VariableName -> ΛP
+makeSafeFor (ΛP (x :-: s) t) var
+ | x /= var = ΛP (x :-: makeTypeSafeFor s var) $ makeSafeFor t var
+ | otherwise = ΛP (newName :-: makeTypeSafeFor s var) $ makeSafeFor (replaceName t x newName) var
+ where
+  newName = "_" ++ var
+makeSafeFor (ΛPT p t) var
+ | p /= var = ΛPT p $ makeSafeFor t var
+ | otherwise = ΛPT newName $ makeSafeFor (replaceName t p newName) var
+ where
+  newName = "_" ++ var
+makeSafeFor (App x y) var = App (makeSafeFor x var) (makeSafeFor y var)
+makeSafeFor (Var (x :-: s)) var = Var (x :-: makeTypeSafeFor s var)
+
 substitute :: ΛP -> VariableName -> ΛP -> Maybe ΛP
+--substitute form var term | trace (show "DEBUG " ++ show form ++ "DEBUG" ++ show var ++ "DEBUG" ++ show term ++ " DEBUG") False = undefined
 substitute (Var (x :-: s)) var term
                           | x /= var = Just $ Var (x :-: s)
-                          | typeOf term /= Just s = Nothing
+                          | typeOf term /= Just s = trace ("DEBUG " ++ x ++ show s ++ " |||| " ++ show (typeOf term) ++ " DEBUG") Nothing
                           | otherwise = Just term
 substitute (ΛP (x :-: s) t) var term
-                          | x /= var = ΛP (x :-: s) <$> substitute t var term
+                          | x /= var = ΛP (safeNewX :-: safeNewS) <$> substitute safeNewTerm var safeNewTerm'
                           | otherwise = Just $ ΛP (x :-: s) t
+                        where
+                          conflictingVariables = freeVariables term `intersection` insert x (boundVariables t)
+                          safeNewTerm = foldr (\conflictVar t' -> makeSafeFor t' conflictVar) t $ toList conflictingVariables
+                          safeNewTerm' = foldr (\conflictVar t' -> makeSafeFor t' conflictVar) term $ toList conflictingVariables
+                          safeNewX = if x `elem` conflictingVariables then "_" ++ x else x
+                          safeNewS = foldr (\conflictVar s' -> makeTypeSafeFor s' conflictVar) s $ toList conflictingVariables
 substitute (ΛPT x t) var term
-                          | x /= var = ΛPT x <$> substitute t var term
+                          | x /= var = ΛPT safeNewX <$> substitute safeNewTerm var safeNewTerm'
                           | otherwise = Just $ ΛPT x t
+                        where
+                          conflictingVariables = freeVariables term `intersection` boundVariables term
+                          safeNewTerm = foldr (\conflictVar t' -> makeSafeFor t' conflictVar) t $ toList conflictingVariables
+                          safeNewTerm' = foldr (\conflictVar t' -> makeSafeFor t' conflictVar) term $ toList conflictingVariables
+                          safeNewX = if x `elem` conflictingVariables then "_" ++ x else x
 substitute (App x y) var term = App <$> substitute x var term <*> substitute y var term
 
 substituteType :: PType -> VariableName -> PType -> PType
@@ -278,6 +319,28 @@ substituteTypes (ΛPT p term) var t
  | p /= var = ΛPT p $ substituteTypes term var t
  | otherwise = ΛPT p term
 substituteTypes (App x y) var t = App (substituteTypes x var t) (substituteTypes y var t)
+
+replaceName :: ΛP -> VariableName -> VariableName -> ΛP
+replaceName (Var (x :-: s)) old new
+ | x == old = Var (new :-: replaceNameInType s old new)
+ | otherwise = Var (x :-: replaceNameInType s old new)
+replaceName (ΛP (x :-: s) term) old new
+ | x == old = ΛP (new :-: replaceNameInType s old new) $ replaceName term old new
+ | otherwise = ΛP (x :-: replaceNameInType s old new) $ replaceName term old new
+replaceName (ΛPT x term) old new
+ | x == old = ΛPT new $ replaceName term old new
+ | otherwise = ΛPT x $ replaceName term old new
+replaceName (App x y) old new = App (replaceName x old new) (replaceName y old new)
+
+replaceNameInType :: PType -> VariableName -> VariableName -> PType
+replaceNameInType (Pure x) old new
+ | x /= old = Pure x
+ | otherwise = Pure new
+replaceNameInType (x :-> y) old new = replaceNameInType x old new :-> replaceNameInType y old new
+replaceNameInType (Forall p t) old new
+ | p /= old = Forall p $ replaceNameInType t old new
+ | p == old = Forall p t
+replaceNameInType t _ _ = t
 
 hasβRedex :: ΛP -> Bool
 hasβRedex (App (ΛP _ _) t) = typeOf t /= Just Type
@@ -313,7 +376,7 @@ betaReductions = βReductions
  where reduction = take 1 $ βReductions t
 
 normalForm :: ΛP -> ΛP
-normalForm t | trace (prettyLambdaP t) False = undefined
+--normalForm t | trace (prettyLambdaP t) False = undefined
 normalForm t
  | isNormalForm t = t
  | otherwise = (normalForm . βReduceLeft) t
