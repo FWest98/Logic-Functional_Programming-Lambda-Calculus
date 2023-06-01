@@ -20,11 +20,11 @@ more readable than {Λ "x" (Λ "y" (App (Var "x") (Var "y")))}.
 
 -- Define module, list exports
 module Lambda (
-    Λ,
-    λ, (-->), ($$),
-    ppΛ, showΛ,
+    Λ, Lambda,
+    λ, l, (-->), ($$),
+    prettyΛ, prettyLambda, showΛ, showLambda,
     freeVariables, substitute,
-    isNormalForm, βReductions, normalForm, (===)
+    isNormalForm, βReductions, betaReductions, normalForm, (===)
 ) where
 
 -- Imports
@@ -34,6 +34,7 @@ import Data.Set (Set, delete, union, singleton)
 type Variable = String
 data Λ = Var Variable | Λ Variable Λ | App Λ Λ
     deriving (Show)
+type Lambda = Λ
 
 -- Defining the α-equivalence between pre-terms
 type EquivalenceContext = [(Variable, Variable)]
@@ -64,8 +65,9 @@ instance ΛParams (Λ -> Λ) where
 instance (ΛParams a) => ΛParams (Variable -> a) where
   toΛparams xs x = toΛparams (xs ++ [x])
 
-λ :: ΛParams a => a
+λ,l :: ΛParams a => a
 λ = toΛparams []
+l = λ
 
 class Λable a where
   toΛ :: a -> Λ
@@ -82,17 +84,19 @@ x $$ y = App (toΛ x) (toΛ y)
 infixl 7 $$
 
 -- Pretty printing
-ppΛ :: Λ -> String
-ppΛ (Var x) = x
-ppΛ (Λ x term@(Λ _ _)) = "λ" ++ x ++ tail (ppΛ term)
-ppΛ (Λ x term) = "λ" ++ x ++ "." ++ ppΛ term
-ppΛ (App x@(Λ _ _) y@(Var _)) = "(" ++ ppΛ x ++ ")" ++ ppΛ y
-ppΛ (App x@(Λ _ _) y) = "(" ++ ppΛ x ++ ")(" ++ ppΛ y ++ ")"
-ppΛ (App x y@(Var _)) = ppΛ x ++ ppΛ y
-ppΛ (App x y) = ppΛ x ++ "(" ++ ppΛ y ++ ")"
+prettyΛ, prettyLambda :: Λ -> String
+prettyLambda = prettyΛ
+prettyΛ (Var x) = x
+prettyΛ (Λ x term@(Λ _ _)) = "λ" ++ x ++ tail (prettyΛ term)
+prettyΛ (Λ x term) = "λ" ++ x ++ "." ++ prettyΛ term
+prettyΛ (App x@(Λ _ _) y@(Var _)) = "(" ++ prettyΛ x ++ ")" ++ prettyΛ y
+prettyΛ (App x@(Λ _ _) y) = "(" ++ prettyΛ x ++ ")(" ++ prettyΛ y ++ ")"
+prettyΛ (App x y@(Var _)) = prettyΛ x ++ prettyΛ y
+prettyΛ (App x y) = prettyΛ x ++ "(" ++ prettyΛ y ++ ")"
 
-showΛ :: Λ -> IO ()
-showΛ = putStrLn . ppΛ
+showΛ, showLambda :: Λ -> IO ()
+showLambda = showΛ
+showΛ = putStrLn . prettyΛ
 
 -- Determining the set of free variables
 freeVariables :: Λ -> Set Variable
@@ -121,7 +125,8 @@ isNormalForm :: Λ -> Bool
 isNormalForm = not . hasβRedex
 
 -- Perform one of each possible β-redex in the lambda term
-βReductions :: Λ -> [Λ]
+βReductions, betaReductions :: Λ -> [Λ]
+betaReductions = βReductions
 βReductions (App (Λ x term) n) = [substitute term x n] ++ reduceTerm ++ reduceApp
     where
         reduceTerm = (\newTerm -> App (Λ x newTerm) n) <$> βReductions term

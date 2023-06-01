@@ -1,11 +1,11 @@
 \begin{code}
 
 module TypedLambda (
-    ΛT,
-    λT, (-->), ($$), (==>), TypeableVariable((:::)),
-    ppΛT, ppType, showΛT, showType, showΛTType,
+    ΛT, LambdaT,
+    λT, lT, (-->), ($$), (==>), TypeableVariable((:::)),
+    prettyΛT, prettyLambdaT, prettyType, showΛT, showLambdaT, showType, showTypeΛT, showTypeLambdaT,
     freeVariables, substitute,
-    isNormalForm, βReductions, normalForm, (===)
+    isNormalForm, βReductions, betaReductions, normalForm, (===)
 ) where
 
 -- Imports
@@ -20,6 +20,7 @@ data Variable = VariableName :-: Type
     deriving (Show, Eq, Ord)
 data ΛT = Var Variable | ΛT Variable ΛT | App ΛT ΛT
     deriving (Show)
+type LambdaT = ΛT
 
 infixr 7 :->
 infixl 6 :-:
@@ -57,11 +58,9 @@ instance (ΛTParams a) => ΛTParams (Variable -> a) where
 instance (ΛTParams a) => ΛTParams (TypeableVariable -> a) where
   toΛTparams xs x = toΛTparams (xs ++ [toVariable x])
 
-λT :: ΛTParams a => a
+λT, lT :: ΛTParams a => a
+lT = λT
 λT = toΛTparams []
-
--- λ ("x" :-: "p") ("y" :-: "s") --> "x"
--- λ ("x" :-: "p" :-> )
 
 class Typable a where
   toType :: a -> Type
@@ -95,35 +94,34 @@ infixl 6 :::
 toVariable :: TypeableVariable -> Variable
 toVariable (x ::: σ) = x :-: toType σ
 
-ppType :: Type -> String
-ppType (Pure σ) = σ
-ppType (σ@(Pure _) :-> τ) = ppType σ ++ "->" ++ ppType τ
-ppType (σ :-> τ) = "(" ++ ppType σ ++ ")->" ++ ppType τ
-ppType Null = "?"
-ppType Perp = "⟂"
+prettyType :: Type -> String
+prettyType (Pure σ) = σ
+prettyType (σ@(Pure _) :-> τ) = prettyType σ ++ "->" ++ prettyType τ
+prettyType (σ :-> τ) = "(" ++ prettyType σ ++ ")->" ++ prettyType τ
+prettyType Null = "?"
+prettyType Perp = "⟂"
 
-ppΛT :: ΛT -> String
-ppΛT (Var (x :-: Null)) = x
-ppΛT (Var (x :-: σ)) = "(" ++ x ++ ":" ++ ppType σ ++ ")"
-ppΛT (ΛT (x :-: σ) term@(ΛT _ _)) = "λ" ++ x ++ ":" ++ ppType σ ++ "," ++ tail (ppΛT term)
-ppΛT (ΛT (x :-: σ) term) = "λ" ++ x ++ ":" ++ ppType σ ++ "." ++ ppΛT term
-ppΛT (App x@(ΛT _ _) y@(Var _)) = "(" ++ ppΛT x ++ ")" ++ ppΛT y
-ppΛT (App x@(ΛT _ _) y) = "(" ++ ppΛT x ++ ")(" ++ ppΛT y ++ ")"
-ppΛT (App x y@(Var _)) = ppΛT x ++ ppΛT y
-ppΛT (App x y) = ppΛT x ++ "(" ++ ppΛT y ++ ")"
+prettyΛT, prettyLambdaT :: ΛT -> String
+prettyLambdaT = prettyΛT
+prettyΛT (Var (x :-: Null)) = x
+prettyΛT (Var (x :-: σ)) = "(" ++ x ++ ":" ++ prettyType σ ++ ")"
+prettyΛT (ΛT (x :-: σ) term@(ΛT _ _)) = "λ" ++ x ++ ":" ++ prettyType σ ++ "," ++ tail (prettyΛT term)
+prettyΛT (ΛT (x :-: σ) term) = "λ" ++ x ++ ":" ++ prettyType σ ++ "." ++ prettyΛT term
+prettyΛT (App x@(ΛT _ _) y@(Var _)) = "(" ++ prettyΛT x ++ ")" ++ prettyΛT y
+prettyΛT (App x@(ΛT _ _) y) = "(" ++ prettyΛT x ++ ")(" ++ prettyΛT y ++ ")"
+prettyΛT (App x y@(Var _)) = prettyΛT x ++ prettyΛT y
+prettyΛT (App x y) = prettyΛT x ++ "(" ++ prettyΛT y ++ ")"
 
-showΛT :: ΛT -> IO ()
-showΛT = putStrLn . ppΛT
+showΛT, showLambdaT :: ΛT -> IO ()
+showLambdaT = showΛT
+showΛT = putStrLn . prettyΛT
 
 showType :: Type -> IO ()
-showType = putStrLn . ppType
+showType = putStrLn . prettyType
 
-showΛTType :: ΛT -> IO ()
-showΛTType t = putStrLn $ maybe "Impossible type" ppType (typeOf t)
-
-bar, fobo :: ΛT
-bar = λT ("x" ::: "σ" ==> "τ" ==> "ρ") ("y" ::: "σ" ==> "τ") ("z" ::: "σ") --> "x" $$ "z" $$ ("y" $$ "z")
-fobo = deduceTypes bar mempty
+showTypeΛT, showTypeLambdaT :: ΛT -> IO ()
+showTypeLambdaT = showTypeΛT
+showTypeΛT t = putStrLn $ maybe "Impossible type" prettyType (typeOf t)
 
 freeVariables :: ΛT -> Set VariableName
 freeVariables (Var (x :-: _)) = singleton x
@@ -194,7 +192,8 @@ hasβRedex (App x y) = hasβRedex x || hasβRedex y
 isNormalForm :: ΛT -> Bool
 isNormalForm = not . hasβRedex
 
-βReductions :: ΛT -> [ΛT]
+βReductions, betaReductions :: ΛT -> [ΛT]
+betaReductions = βReductions
 βReductions (App (ΛT (x :-: σ) term) n) = [fromJust substitution | isJust substitution] ++ reduceTerm ++ reduceApp
   where
     reduceTerm = (\newTerm -> App (ΛT (x :-: σ) newTerm) n) <$> βReductions term
