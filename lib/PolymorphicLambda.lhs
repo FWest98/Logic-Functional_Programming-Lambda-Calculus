@@ -177,9 +177,9 @@ showTypeΛP t = putStrLn $ maybe "Impossible type" prettyPType (typeOf t)
 
 boundVariables :: ΛP -> Set VariableName
 boundVariables (Var _) = empty
-boundVariables (ΛP (x :-: _) _) = singleton x
-boundVariables (ΛPT x _) = singleton x
-boundVariables (App _ _) = empty
+boundVariables (ΛP (x :-: _) t) = insert x $ boundVariables t
+boundVariables (ΛPT x t) = insert x $ boundVariables t
+boundVariables (App x y) = boundVariables x `union` boundVariables y
 
 freeVariables :: ΛP -> Set VariableName
 freeVariables (Var (x :-: t)) = insert x $ freeTypeVariables t
