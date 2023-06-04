@@ -100,7 +100,7 @@ class (ΛCalculus λ) => TypedΛCalculus λ where
 type TypeMapping λ = Set (VariableName λ, Type λ)
 
 instance {-# OVERLAPPABLE #-} (TypedΛCalculus λ) => Eq (Type λ) where
-    (==) :: λtype -> λtype -> Bool
-    (==) = undefined
+    (==) :: Type λ -> Type λ -> Bool
+    σ == τ = typesEquivalent σ τ []
 
 \end{code}

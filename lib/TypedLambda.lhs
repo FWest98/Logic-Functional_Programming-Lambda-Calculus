@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module TypedLambda (
-    Λ, Lambda, Type,
+    Λ, Lambda,
     λ, l, (-->), ($$), (==>), TypeableVariable((:::))
 ) where
 -- Imports
@@ -117,9 +117,7 @@ instance TypedΛCalculus Λ where
         = join $ functionType <$> typeOf x <*> typeOf y
         where
             functionType :: Type Λ -> Type Λ -> Maybe (Type Λ)
-            functionType (σ :-> τ) υ
-                | σ == υ = Just τ
-                | otherwise = Nothing
+            functionType (σ :-> τ) υ | σ == υ = Just τ
             functionType _ _ = Nothing
 
     renameType :: Type Λ -> VariableName Λ -> VariableName Λ -> Type Λ
@@ -132,15 +130,15 @@ instance TypedΛCalculus Λ where
     deduceTypes :: Λ -> TypeMapping Λ -> Λ
     deduceTypes (Var (x :-: Null)) types
         | isJust mapping = Var (x :-: fromJust mapping)
-        | otherwise = Var (x :-: Null)
+        | otherwise      = Var (x :-: Null)
         where mapping = lookupSet x types
     deduceTypes (Var x) _ = Var x
     deduceTypes (Λ (x :-: σ) t) types = Λ (x :-: σ) $ deduceTypes t $ insert (x, σ) types
     deduceTypes (App xTerm (Var (x :-: Null))) types
-        | not isFunction = App deduceX (Var (x :-: Null))
-        | isNothing mappedType = App deduceX (Var (x :-: σ))
-        | fromJust mappedType == σ = App deduceX (Var (x :-: σ))
-        | otherwise = App deduceX (Var (x :-: Null))
+        | not isFunction            = App deduceX (Var (x :-: Null))
+        | isNothing mappedType      = App deduceX (Var (x :-: σ))
+        | fromJust mappedType == σ  = App deduceX (Var (x :-: σ))
+        | otherwise                 = App deduceX (Var (x :-: Null))
         where
             mappedType = lookupSet x types
             functionType = typeOf deduceX

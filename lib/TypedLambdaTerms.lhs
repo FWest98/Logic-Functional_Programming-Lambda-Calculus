@@ -2,6 +2,7 @@
 
 module TypedLambdaTerms where
 
+import Lambda
 import TypedLambda
 
 -- Common lambda terms
