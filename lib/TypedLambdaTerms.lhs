@@ -1,5 +1,8 @@
-\begin{code}
+\subsection{Example Terms}
 
+Another set of example terms in simply-typed $λ$-calculus shows how constrained the calculus is: we can esseitally only work with variables of type {\tt σ} to do any kind of combinations between operations. For a boolean to have a consistent signature, we must have both variables of the same type, and the same holds for pairs. The terms are all equivalent to their untyped counterparts.
+
+\begin{code}
 module TypedLambdaTerms where
 
 import Lambda
@@ -35,5 +38,5 @@ import TypedLambda
 λp1, λp2 :: Λ
 λp1 = λ ("p" ::: λpairType ==> "σ") --> "p" $$ (λ ("x" ::: "σ") ("y" ::: "σ") --> "x")
 λp2 = λ ("p" ::: λpairType ==> "σ") --> "p" $$ (λ ("x" ::: "σ") ("y" ::: "σ") --> "y")
-
 \end{code}
+\vspace{-23pt}

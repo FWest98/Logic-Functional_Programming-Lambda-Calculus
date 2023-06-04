@@ -3,11 +3,5 @@ cradle:
     - path: "./lib"
       component: "lambda-calculus:lib"
 
-    - path: "./exec/Main.lhs"
-      component: "lambda-calculus:exe:myprogram"
-
-    - path: "./exec/Paths_lambda-calculus.hs"
-      component: "lambda-calculus:exe:myprogram"
-
     - path: "./test"
-      component: "lambda-calculus:test:lambda_tests"
+      component: "lambda-calculus:test:UntypedLambdaTests"

@@ -1,14 +1,8 @@
+\subsection{Example Terms}
+We implement some standard example terms in our untyped $λ$-calculus. These can be used for basic testing or exploration of the realms of $λ$-terms.
+
 \begin{code}
-
-{-
-
-Some commonly-used lambda terms for various applications, this
-serves as a small library to simplify testing and working with
-the lambda calculus implemented in this library.
-
--}
-
-module LambdaTerms where
+module UntypedLambdaTerms where
 
 import UntypedLambda
 
@@ -19,7 +13,12 @@ import UntypedLambda
 λS = λ"x" "y" "z" --> "x" $$ "z" $$ ("y" $$ "z")
 λΩ = let λω = λ "x" --> "x" $$ "x" in λω $$ λω
 λY = λ "f" --> (λ "x" --> "f" $$ ("x" $$ "x")) $$ (λ "x" --> "f" $$ ("x" $$ "x"))
+\end{code}
+\vspace{-23pt}
 
+Notably here, {\tt λΩ} is non-normalising and always reduces to itself. Similarly, {\tt λY} is non-normalising, but has an infinite reduction path to ever-different terms - it will never cycle back to itself. {\tt λK} and {\tt λS} correspond to combinators as they are defined in combinatory logic.
+
+\begin{code}
 -- Boolean values
 λtrue, λfalse :: Λ
 λtrue = λ "x" "y" --> "x"
@@ -43,7 +42,12 @@ import UntypedLambda
 λp1, λp2 :: Λ
 λp1 = λ "p" --> "p" $$ (λ "x" "y" --> "x")
 λp2 = λ "p" --> "p" $$ (λ "x" "y" --> "y")
+\end{code}
+\vspace{-23pt}
 
+We implement standard booleans and some syntax to more easily do a ternary if-statement; but it essentially just concatenates the three terms. In addition, we implement pairs and two accessors/deconstructors.
+
+\begin{code}
 -- Church numerals and various arithmetical operations
 church :: Int -> Λ
 church 0 = λ "f" "x" --> "x"
@@ -76,5 +80,7 @@ church n = λ "f" "x" --> fs n
 λpred :: Λ
 λpred = λ "x" --> λp1 $$ (λQ $$ "x")
     where λQ = λit $$ (λpair $$ church 0 $$ church 0) $$ (λ"x" --> (λpair $$ (λp2 $$ "x") $$ (λsucc $$ (λp2 $$ "x"))))
-
 \end{code}
+\vspace{-23pt}
+
+Lastly, we implement Church numerals and various arithmetical operations in a canonical way. Only the predecessor is slightly different, taken from how it was introduced in the Type Theory course. These examples show the utility of the `parser' functions we implemented, and how they drastically help code clarity. At the same time, we keep the analysis from GHC to ensure our syntax is correct, so we don't run into issues at runtime when it turns out we wrote an incorrect $λ$-term.

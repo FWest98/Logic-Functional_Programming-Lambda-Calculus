@@ -3,14 +3,14 @@
 module Main where
 
 import Lambda
+import UntypedLambda
 import Data.Set
 
 import Test.Hspec
-import Test.QuickCheck
 
 -- Testing data
 expr :: Λ
-expr = (λ"x" --> v"x") $$ v"y"
+expr = (λ"x" --> "x") $$ "y"
 
 main :: IO ()
 main = hspec $ do
@@ -18,11 +18,11 @@ main = hspec $ do
         it "correct free variables" $
             freeVariables expr `shouldBe` singleton "y"
         it "substitution" $
-            substitute expr "x" (v"y") `shouldBe` expr
+            substitute expr "x" (fromVarName "y") `shouldBe` Just expr
         it "sub2" $
-            substitute expr "y" (v"x") `shouldNotBe` expr
+            substitute expr "y" (fromVarName "x") `shouldNotBe` Just expr
         it "αEquiv" $
-            (λ"x" # "y" --> v"x" $$ v"y") `shouldBe` (λ"y" # "x" --> v"y" $$ v"x")
+            ((λ"x" "z" --> "x" $$ "z") == (λ"y" "z" --> "y" $$ "z")) `shouldBe` True
 
 -- test ideas
 -- substitution of variable to variable should not be alpha equivalent unless same variable

@@ -16,19 +16,12 @@ dependencies:
 library:
   source-dirs: lib
 
-executables:
-  myprogram:
-    main: Main.lhs
-    source-dirs: exec
-    dependencies:
-      - lambda-calculus
-
 tests:
-  lambda_tests:
-    main: lambda_tests.lhs
+  UntypedLambdaTests:
+    main: UntypedLambdaTests.lhs
     source-dirs: test
     dependencies:
-      - lambda-calculus
       - QuickCheck
       - hspec
       - containers
+      - lambda-calculus

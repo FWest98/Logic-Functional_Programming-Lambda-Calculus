@@ -1,0 +1,211 @@
+% !TeX spellcheck = en_GB
+
+% List of packages and options for them
+% Base packages
+\documentclass[a4paper,10pt]{article}
+\usepackage{a4wide} \bibliographystyle{plain}
+\usepackage[english]{babel}
+\usepackage{parskip} % To prevent indentation of new paragraphs
+\usepackage[utf8]{luainputenc}
+\usepackage{lmodern} % Modern font with a.o. euro symbols included
+\usepackage[T1]{fontenc} % Fix font encoding in the document to improve the layout
+%\usepackage{placeins} % Barrier for floats
+%\usepackage{pdfpages} % Include pdfs in your document
+%\usepackage{eurosym} % Include the euro symbol
+%\usepackage[toc,page]{appendix} % Appendix for articles
+
+% Text layout packages
+\usepackage{color} % For fancy colors
+\usepackage{xcolor} % For colors
+\usepackage[hidelinks]{hyperref}
+\hypersetup{colorlinks=false,allbordercolors=gray!30!white,pdfborderstyle={/S/U/W 1}}
+\usepackage[inline]{enumitem} % For lists
+%\usepackage{multicol} % For multi-column texts
+\usepackage{fontspec} % For custom fonts
+\usepackage{microtype} % For better text appearance
+%\usepackage{titling} % For custom size titles
+%\usepackage{soul} % For strikethrough text
+
+% Figures & References packages
+\usepackage[labelfont=bf]{caption} \captionsetup{width=0.8\textwidth, font=small} % For captions
+%\usepackage{subcaption} % For more advanced captions, such as figure 1a, b, c
+%\usepackage{wrapfig} % For figures on the side of the text
+%\usepackage{epstopdf} % To be able to include eps files
+%\usepackage{graphicx} % Include more types of images
+%\graphicspath{{figures/}{pictures/}{images/}{./}}
+%\usepackage[style=numeric,citestyle=numeric-comp,natbib=true,sorting=none]{biblatex} % Bibliography
+%\addbibresource{references.bib} % References file
+
+% Graphs packages
+\usepackage{tikz} % Used for custom vectors and other drawings
+%\usetikzlibrary{decorations.pathmorphing,patterns,arrows,arrows.meta,calc,angles,quotes} % Tikz packages for drawing figures
+%\usetikzlibrary{external} \tikzexternalize[prefix=graphs/] % Cached tikz graphics
+%\usepackage{pgfplots} \usepgfplotslibrary{fillbetween,patchplots} \pgfplotsset{compat=newest} % For fancy graphs
+%\usepackage{pgfplotstable} % To use tables as data source for graphs
+%\usepackage{filecontents} % To export content to a given file from latex
+
+% Table packages
+%\usepackage{booktabs} % Used for lines in tables
+%\usepackage{array} % For vertical alignment of text in cells
+%\usepackage{xltabular} % For page-spanning tables
+%\usepackage{multirow} % For row-spans besides column-spans
+%\usepackage{tabularx} % Tables with automatically expanding columns
+%\usepackage[column=C]{cellspace} \addparagraphcolumntypes{X} % Tables with paragraph columns
+% Fix normal tabular booktabs
+%\AtBeginEnvironment{tabular}{\let\xltabular\undefined}
+%\AtBeginEnvironment{tabularx}{\let\xltabular\undefined}
+
+% Computing Science packages
+\usepackage{listings} % For code listings
+\usepackage{minted} % For code coloring (requires color)
+%\usepackage[os=win]{menukeys} % For keys formatting
+
+% Maths packages
+\usepackage{amsmath} % For most maths things
+%\usepackage{physics} % For derivative sign things
+\usepackage{mathtools} % More maths things (fixes things in amsmath, requires it as well)
+%\usepackage{amssymb} % Special symbols
+%\usepackage{gensymb} % Degree symbol
+%\usepackage{ebproof} % Tree proofs
+%\usepackage{mathdots} % Special dots
+%\usepackage[framed,amsmath,thmmarks,thref,hyperref]{ntheorem} % Theorems
+\usepackage{unicode-math} \DeclareMathAlphabet{\mathcal}{OMS}{cmsy}{m}{n} \let\mathbbold\mathbb \DeclareMathAlphabet{\mathbbnew}{U}{msb}{m}{n} \let\mathbb\mathbbnew % Unicode support for math characters
+
+% Physics packages
+%\usepackage{siunitx} \sisetup{load-configurations = abbreviations, separate-uncertainty=true, exponent-product=\cdot, output-product=\cdot} % Si units!
+% Make italics numbers possible in siunitx columns
+%\usepackage{etoolbox}
+%\robustify\itshape
+%\robustify\bf
+%\robustify\bfseries
+%\sisetup{detect-all=true}
+%\usepackage{mhchem} % Chemical equations package
+%\usetikzlibrary{quantikz} % Quantum Computing diagrams
+%\tikzset{thin lines}
+
+% Per-section numbering
+%\numberwithin{equation}{section}
+%\numberwithin{figure}{section}
+
+% Theorems setup
+%\theoremseparator{}
+%\theorempreskip{10ptplus5ptminus5pt}
+%\newtheorem{theorem}{Theorem}[section]
+%\newtheorem{propositionWP}[theorem]{Proposition}
+%\theoremsymbol{\ensuremath{\square}}
+%\theorempostskip{10ptplus5ptminus5pt}
+%\theorempreskip{0pt}
+%\theorembodyfont{\normalfont}
+%\theoremstyle{nonumberplain}
+%\newtheorem{proof}{Proof}
+
+%\theorembodyfont{\itshape}
+%\theoremstyle{plain}
+%\theorempreskip{10ptplus5ptminus5pt}
+%\theorempostskip{10ptplus5ptminus5pt}
+%\newtheorem{lemma}[theorem]{Lemma}
+%\newtheorem{proposition}[theorem]{Proposition}
+%\newtheorem*{corollary}{Corollary}
+
+%\theorembodyfont{\slshape}
+%\newtheorem{definition}{Definition}[section]
+
+%\theoremsymbol{}
+%\newtheorem{notation}[definition]{Notation}
+%\newtheorem{example}{Example}[section]
+
+%\theoremsymbol{}
+%\theorembodyfont{\itshape}
+%\theorempreskip{0pt}
+%\theorempostskip{0pt}
+%\theoremprework{\bigskip\hrule\leavevmode}
+%\theorempostwork{\bigskip\hrule\leavevmode}
+%\newtheorem{axiom}{Axiom}
+
+% Command setup
+%\copymenustyle{command}{menus}
+%\changemenuelement{command}{single}{tw@menus@base, signal from=west, signal to=east, inner xsep=3pt}
+%\changemenuelement{command}{first}{tw@menus@base, signal from=west, signal to=east, inner xsep=3pt}
+%\changemenuelement{command}{middle}{tw@menus@base, signal from=west, signal to=east, inner xsep=3pt}
+%\changemenuelement{command}{last}{tw@menus@base, signal from=west, signal to=east, inner xsep=3pt}
+%\changemenuelement{command}{pre}{\tikz[baseline={($(tw@node.base)$)}]{\node(tw@node)[tw@menus@base,signal to=east,minimum width=0.6em,inner xsep=0pt,\usemenucolor{br}]{};}\hspace{-0.5em}}
+%\changemenuelement{command}{sep}{\hspace{-0.5em}\tikz[baseline={($(tw@node.base)$)}]{\node(tw@node)[tw@menus@base,signal to=east,signal from=west,minimum width=0.9em,inner xsep=0pt,\usemenucolor{br}]{};}\hspace{-0.5em}}
+%\newmenumacro{\command}[>]{command}
+
+%\copymenustyle{error}{menus}
+%\changemenuelement{error}{first}{tw@menus@base}
+%\changemenuelement{error}{last}{tw@menus@base}
+%\changemenuelement{error}{middle}{tw@menus@base}
+%\changemenuelement{error}{pre}{\tikz[baseline={($(tw@node.base)$)}]{\node(tw@node)[tw@menus@base,red!55!black,inner xsep=2pt,minimum width=0]{\textcolor{white}{\scalebox{1.5}[1]{\ttbf !}}};}\nobreak\hspace{-0.1em}\nobreak}
+%\changemenuelement{error}{single}{tw@menus@base}
+%\newmenumacro{\error}[\noop]{error}
+
+% Coding setup
+\definecolor{Gray}{gray}{0.95}
+
+\defaultfontfeatures{RawFeature={+axis={wght=100}}}
+\setmonofont[Scale=0.88,RawFeature={+axis={wght=350}}]{Cascadia Code}
+\newfontface\ttbf{Cascadia Code}[Scale=0.88,RawFeature={+axis={wght=700}}]
+\renewcommand{\theFancyVerbLine}{\sffamily\textcolor[rgb]{0.5,0.5,0.5}{\scriptsize\arabic{FancyVerbLine}}}
+\usemintedstyle{vs}
+\renewcommand{\listingscaption}{Haskell}
+
+\newmintinline[hs]{Haskell}{
+	mathescape,
+	tabsize = 4
+}
+
+%\newminted[javashort]{Java}{
+	%	tabsize = 4,
+	%	breaklines,
+	%	breakautoindent = true,
+	%	bgcolor = white,
+	%	fontsize = \fontsize{8pt}{12pt}
+	%}
+
+\newminted[code]{Haskell}{
+	linenos,
+	frame = lines,
+	framesep = 2mm,
+	breaklines,
+	breakautoindent = true,
+	fontsize = \fontsize{8pt}{10.5pt},
+	tabsize = 4,
+	bgcolor = white,
+	mathescape = false,
+	texcomments = false
+}
+
+\title{Putting the Λ in HaskeΛΛ}
+\author{Floris Westerman}
+
+\long\def\ignore#1{}
+\makeatletter
+\def\verbatim@nolig@list{}
+\makeatother
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We provide an implementation of various $λ$-calculi in Haskell. We define a typeclass for such calculi, and then implement untyped, simply-typed, and polymorphic versions. We focus on developer-friendly and accessible syntax, so that a developer can use the library to work with $λ$-calculus in their own code. Because of the developer focus, we do not provide a parser or any other "user-friendly" tools, except for some pretty printing. Lastly, we include some sample $λ$-terms for each implemented calculus.
+\end{abstract}
+
+\vfill
+
+\tableofcontents
+
+\clearpage
+\input{lib/Lambda.lhs}
+\clearpage
+\input{lib/UntypedLambda.lhs}
+\input{lib/UntypedLambdaTerms.lhs}
+\clearpage
+\input{lib/TypedLambda.lhs}
+\input{lib/TypedLambdaTerms.lhs}
+\clearpage
+\input{lib/PolymorphicLambda.lhs}
+\input{lib/PolymorphicLambdaTerms.lhs}
+
+\end{document}

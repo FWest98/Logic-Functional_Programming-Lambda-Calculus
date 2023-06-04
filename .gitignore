@@ -27,3 +27,4 @@ cabal.sandbox.config
 dist
 dist-*
 report.cabal
+_minted-*

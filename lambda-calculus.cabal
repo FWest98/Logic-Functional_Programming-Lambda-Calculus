@@ -34,24 +34,9 @@ library
     , random
   default-language: Haskell2010
 
-executable myprogram
-  main-is: Main.lhs
-  other-modules:
-      Paths_lambda_calculus
-  hs-source-dirs:
-      exec
-  ghc-options: -Wall
-  build-depends:
-      QuickCheck
-    , base
-    , containers
-    , lambda-calculus
-    , random
-  default-language: Haskell2010
-
-test-suite lambda_tests
+test-suite UntypedLambdaTests
   type: exitcode-stdio-1.0
-  main-is: lambda_tests.lhs
+  main-is: UntypedLambdaTests.lhs
   other-modules:
       Paths_lambda_calculus
   hs-source-dirs:
