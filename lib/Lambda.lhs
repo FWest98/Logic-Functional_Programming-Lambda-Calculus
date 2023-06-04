@@ -6,7 +6,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module Lambda (
-    ΛCalculus(
+    ΛCalculus (
         Variable, VariableName,
         fromVar, fromVarName, fromΛ, fromApp,
         prettyΛ, prettyLambda, showΛ, showLambda,
@@ -14,7 +14,15 @@ module Lambda (
         renameVariable, prepareSubstitution, substitute, performSubstitute,
         βReductions, betaReductions,
         isNormalForm, normalForm, (===)
-    )
+    ),
+    EquivalenceContext,
+    TypedΛCalculus (
+        Type,
+        prettyType, showType, showTermType,
+        typeOf, typesEquivalent, renameType,
+        deduceTypes, hasValidType
+    ),
+    TypeMapping
 ) where
 
 import Data.Set(Set, toList)
@@ -22,6 +30,7 @@ import Data.Set(Set, toList)
 class ΛCalculus λ where
     type Variable λ
     type VariableName λ
+    type VariableName λ = String
 
     fromVar :: Variable λ -> λ
     fromVarName :: VariableName λ -> λ
@@ -32,9 +41,10 @@ class ΛCalculus λ where
     prettyLambda = prettyΛ
     showΛ, showLambda :: λ -> IO ()
     showLambda = showΛ
+    showΛ = putStrLn . prettyΛ
 
     freeVariables :: λ -> Set (VariableName λ)
-    αEquiv :: λ -> λ -> [(Variable λ, Variable λ)] -> Bool
+    αEquiv :: λ -> λ -> EquivalenceContext λ -> Bool
 
     renameVariable :: λ -> VariableName λ -> VariableName λ -> λ
     prepareSubstitution :: λ -> VariableName λ -> λ
@@ -63,9 +73,34 @@ class ΛCalculus λ where
     x === y = x == y || normalForm x == normalForm y
     infix 1 ===
 
+type EquivalenceContext λ = [(VariableName λ, VariableName λ)]
+
 instance {-# OVERLAPPABLE #-} (ΛCalculus λ) => Eq λ where
     (==) :: λ -> λ -> Bool
     x == y = αEquiv x y []
 
+class (ΛCalculus λ) => TypedΛCalculus λ where
+    data Type λ
+
+    prettyType :: Type λ -> String
+    
+    showType :: Type λ -> IO ()
+    showType = putStrLn . prettyType
+
+    showTermType :: λ -> IO ()
+    showTermType term = putStrLn $ maybe "Impossible type" prettyType (typeOf term)
+
+    typesEquivalent :: Type λ -> Type λ -> EquivalenceContext λ -> Bool
+    typeOf :: λ -> Maybe (Type λ)
+
+    renameType :: Type λ -> VariableName λ -> VariableName λ -> Type λ
+    deduceTypes :: λ -> TypeMapping λ -> λ
+    hasValidType :: λ -> TypeMapping λ -> Bool
+
+type TypeMapping λ = Set (VariableName λ, Type λ)
+
+instance {-# OVERLAPPABLE #-} (TypedΛCalculus λ) => Eq (Type λ) where
+    (==) :: λtype -> λtype -> Bool
+    (==) = undefined
 
 \end{code}

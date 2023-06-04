@@ -38,7 +38,6 @@ data Λ = Var ΛVariable | Λ ΛVariable Λ | App Λ Λ
 type Lambda = Λ
 
 instance ΛCalculus Λ where
-    type VariableName Λ = ΛVariable
     type Variable Λ = ΛVariable
 
     fromVar = Var
@@ -56,9 +55,6 @@ instance ΛCalculus Λ where
     prettyΛ (App x y@(Var _)) = prettyΛ x ++ prettyΛ y
     prettyΛ (App x y) = prettyΛ x ++ "(" ++ prettyΛ y ++ ")"
 
-    showΛ :: Λ -> IO ()
-    showΛ = putStrLn . prettyΛ
-
     -- Determining the set of free variables
     freeVariables :: Λ -> Set ΛVariable
     freeVariables (Var x) = singleton x
@@ -72,7 +68,7 @@ instance ΛCalculus Λ where
         where
             yFreeInX = y `elem` freeVariables xTerm
             xFreeInY = x `elem` freeVariables yTerm
-            notCrossBound = x == y || not yFreeInX && not xFreeInY
+            notCrossBound = x == y || (not yFreeInX && not xFreeInY)
 
     αEquiv (App x1 x2) (App y1 y2) context = αEquiv x1 y1 context && αEquiv x2 y2 context
     αEquiv _ _ _ = False
@@ -141,7 +137,7 @@ a --> b = a (toΛ b)
 infixr 6 -->
 
 ($$) :: (ΛTerm a, ΛTerm b) => a -> b -> Λ
-x $$ y = fromApp (toΛ x) (toΛ y)
+x $$ y = App (toΛ x) (toΛ y)
 infixl 7 $$
 
 \end{code}
