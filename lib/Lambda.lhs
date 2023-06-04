@@ -4,25 +4,28 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 module Lambda (
     ΛCalculus (
         Variable, VariableName,
         fromVar, fromVarName, fromΛ, fromApp,
         prettyΛ, prettyLambda, showΛ, showLambda,
-        freeVariables, αEquiv,
-        renameVariable, prepareSubstitution, substitute, performSubstitute,
-        βReductions, betaReductions,
+        αEquiv, βReductions, betaReductions,
         isNormalForm, normalForm, (===)
     ),
     EquivalenceContext,
     TypedΛCalculus (
         Type,
         prettyType, showType, showTermType,
-        typeOf, typesEquivalent, renameType,
+        typeOf, typesEquivalent,
         deduceTypes, hasValidType
     ),
-    TypeMapping
+    TypeMapping,
+    Substitutable (
+        freeVariables, renameVariable,
+        prepareSubstitution, substitute, performSubstitution
+    )
 ) where
 
 import Data.Set(Set, toList)
@@ -43,15 +46,7 @@ class ΛCalculus λ where
     showLambda = showΛ
     showΛ = putStrLn . prettyΛ
 
-    freeVariables :: λ -> Set (VariableName λ)
     αEquiv :: λ -> λ -> EquivalenceContext λ -> Bool
-
-    renameVariable :: λ -> VariableName λ -> VariableName λ -> λ
-    prepareSubstitution :: λ -> VariableName λ -> λ
-    substitute, performSubstitute :: λ -> VariableName λ -> λ -> Maybe λ
-    substitute λ var term = performSubstitute prepared var term
-        where
-            prepared = foldr (flip prepareSubstitution) λ $ toList $ freeVariables term
 
     βReductions, betaReductions :: λ -> [λ]
     betaReductions = βReductions
@@ -93,7 +88,6 @@ class (ΛCalculus λ) => TypedΛCalculus λ where
     typesEquivalent :: Type λ -> Type λ -> EquivalenceContext λ -> Bool
     typeOf :: λ -> Maybe (Type λ)
 
-    renameType :: Type λ -> VariableName λ -> VariableName λ -> Type λ
     deduceTypes :: λ -> TypeMapping λ -> λ
     hasValidType :: λ -> TypeMapping λ -> Bool
 
@@ -102,5 +96,14 @@ type TypeMapping λ = Set (VariableName λ, Type λ)
 instance {-# OVERLAPPABLE #-} (TypedΛCalculus λ) => Eq (Type λ) where
     (==) :: Type λ -> Type λ -> Bool
     σ == τ = typesEquivalent σ τ []
+
+class Substitutable term var | term -> var where
+    freeVariables :: term -> Set var
+    renameVariable :: term -> var -> var -> term
+    prepareSubstitution :: term -> var -> term
+    performSubstitution :: term -> var -> term -> Maybe term
+    substitute :: term -> var -> term -> Maybe term
+    substitute term var new = performSubstitution prepared var new
+        where prepared = foldr (flip prepareSubstitution) term $ toList $ freeVariables new
 
 \end{code}

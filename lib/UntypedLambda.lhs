@@ -37,41 +37,12 @@ data Λ = Var ΛVariable | Λ ΛVariable Λ | App Λ Λ
     deriving (Show)
 type Lambda = Λ
 
-instance ΛCalculus Λ where
-    type Variable Λ = ΛVariable
-
-    fromVar = Var
-    fromVarName = Var
-    fromΛ = Λ
-    fromApp = App
-
-    -- Pretty printing
-    prettyΛ :: Λ -> String
-    prettyΛ (Var x) = x
-    prettyΛ (Λ x term@(Λ _ _)) = "λ" ++ x ++ tail (prettyΛ term)
-    prettyΛ (Λ x term) = "λ" ++ x ++ "." ++ prettyΛ term
-    prettyΛ (App x@(Λ _ _) y@(Var _)) = "(" ++ prettyΛ x ++ ")" ++ prettyΛ y
-    prettyΛ (App x@(Λ _ _) y) = "(" ++ prettyΛ x ++ ")(" ++ prettyΛ y ++ ")"
-    prettyΛ (App x y@(Var _)) = prettyΛ x ++ prettyΛ y
-    prettyΛ (App x y) = prettyΛ x ++ "(" ++ prettyΛ y ++ ")"
-
+instance Substitutable Λ String where
     -- Determining the set of free variables
     freeVariables :: Λ -> Set ΛVariable
     freeVariables (Var x) = singleton x
     freeVariables (Λ x term) = delete x $ freeVariables term
     freeVariables (App x y) = freeVariables x `union` freeVariables y
-
-    -- Defining the α-equivalence between pre-terms
-    αEquiv :: Λ -> Λ -> [(ΛVariable, ΛVariable)] -> Bool
-    αEquiv (Var x) (Var y) context = x == y || (x, y) `elem` context
-    αEquiv (Λ x xTerm) (Λ y yTerm) context = notCrossBound && αEquiv xTerm yTerm ((x, y) : context)
-        where
-            yFreeInX = y `elem` freeVariables xTerm
-            xFreeInY = x `elem` freeVariables yTerm
-            notCrossBound = x == y || (not yFreeInX && not xFreeInY)
-
-    αEquiv (App x1 x2) (App y1 y2) context = αEquiv x1 y1 context && αEquiv x2 y2 context
-    αEquiv _ _ _ = False
 
     -- Performing a substitution
     renameVariable :: Λ -> VariableName Λ -> VariableName Λ -> Λ
@@ -91,14 +62,44 @@ instance ΛCalculus Λ where
     prepareSubstitution (App x y) var = App (prepareSubstitution x var) (prepareSubstitution y var)
     prepareSubstitution var _ = var
 
-    performSubstitute :: Λ -> Variable Λ -> Λ -> Maybe Λ
-    performSubstitute (Var x) var term
+    performSubstitution :: Λ -> Variable Λ -> Λ -> Maybe Λ
+    performSubstitution (Var x) var term
         | x == var = Just term
         | otherwise = Just $ Var x
-    performSubstitute (Λ x t) var term
+    performSubstitution (Λ x t) var term
         | x == var = Just $ Λ x t
-        | otherwise = Λ x <$> performSubstitute t var term
-    performSubstitute (App x y) var term = App <$> performSubstitute x var term <*> performSubstitute y var term
+        | otherwise = Λ x <$> performSubstitution t var term
+    performSubstitution (App x y) var term = App <$> performSubstitution x var term <*> performSubstitution y var term
+
+instance ΛCalculus Λ where
+    type Variable Λ = ΛVariable
+
+    fromVar = Var
+    fromVarName = Var
+    fromΛ = Λ
+    fromApp = App
+
+    -- Pretty printing
+    prettyΛ :: Λ -> String
+    prettyΛ (Var x) = x
+    prettyΛ (Λ x term@(Λ _ _)) = "λ" ++ x ++ tail (prettyΛ term)
+    prettyΛ (Λ x term) = "λ" ++ x ++ "." ++ prettyΛ term
+    prettyΛ (App x@(Λ _ _) y@(Var _)) = "(" ++ prettyΛ x ++ ")" ++ prettyΛ y
+    prettyΛ (App x@(Λ _ _) y) = "(" ++ prettyΛ x ++ ")(" ++ prettyΛ y ++ ")"
+    prettyΛ (App x y@(Var _)) = prettyΛ x ++ prettyΛ y
+    prettyΛ (App x y) = prettyΛ x ++ "(" ++ prettyΛ y ++ ")"
+
+    -- Defining the α-equivalence between pre-terms
+    αEquiv :: Λ -> Λ -> [(ΛVariable, ΛVariable)] -> Bool
+    αEquiv (Var x) (Var y) context = x == y || (x, y) `elem` context
+    αEquiv (Λ x xTerm) (Λ y yTerm) context = notCrossBound && αEquiv xTerm yTerm ((x, y) : context)
+        where
+            yFreeInX = y `elem` freeVariables xTerm
+            xFreeInY = x `elem` freeVariables yTerm
+            notCrossBound = x == y || (not yFreeInX && not xFreeInY)
+
+    αEquiv (App x1 x2) (App y1 y2) context = αEquiv x1 y1 context && αEquiv x2 y2 context
+    αEquiv _ _ _ = False
 
     -- Perform one of each possible β-redex in the lambda term
     βReductions :: Λ -> [Λ]

@@ -27,6 +27,50 @@ type Lambda = Λ
 infixr 7 :->
 infixl 6 :-:
 
+instance Substitutable Λ String where
+    freeVariables :: Λ -> Set (VariableName Λ)
+    freeVariables (Var (x :-: σ)) = insert x $ freeVariables σ
+    freeVariables (Λ (x :-: _) term) = delete x $ freeVariables term
+    freeVariables (ΛT p term) = delete p $ freeVariables term
+    freeVariables (App x y) = freeVariables x `union` freeVariables y
+
+    renameVariable :: Λ -> VariableName Λ -> VariableName Λ -> Λ
+    renameVariable (Var (x :-: σ)) old new
+        | x == old = Var (new :-: renameVariable σ old new)
+        | otherwise = Var (x :-: renameVariable σ old new)
+    renameVariable (Λ (x :-: σ) term) old new
+        | x == old = Λ (new :-: renameVariable σ old new) $ renameVariable term old new
+        | otherwise = Λ (x :-: renameVariable σ old new) $ renameVariable term old new
+    renameVariable (ΛT p term) old new
+        | p == old = ΛT new $ renameVariable term old new
+        | otherwise = ΛT p $ renameVariable term old new
+    renameVariable (App x y) old new = App (renameVariable x old new) (renameVariable y old new)
+
+    prepareSubstitution :: Λ -> VariableName Λ -> Λ
+    prepareSubstitution (Λ (x :-: σ) term) var
+        | x /= var = Λ (x :-: prepareSubstitution σ var) $ prepareSubstitution term var
+        | otherwise = Λ (newName :-: prepareSubstitution σ var) $ prepareSubstitution (renameVariable term x newName) var
+        where newName = "_" ++ var
+    prepareSubstitution (ΛT p term) var
+        | p /= var = ΛT p $ prepareSubstitution term var
+        | otherwise = ΛT newName $ prepareSubstitution (renameVariable term p newName) var
+        where newName = "_" ++ var
+    prepareSubstitution (App x y) var = App (prepareSubstitution x var) (prepareSubstitution y var)
+    prepareSubstitution (Var (x :-: σ)) var = Var (x :-: prepareSubstitution σ var)
+
+    performSubstitution :: Λ -> VariableName Λ -> Λ -> Maybe Λ
+    performSubstitution (Var (x :-: σ)) var term
+        | x /= var = Just $ Var (x :-: σ)
+        | typeOf term /= Just σ = Nothing
+        | otherwise = Just term
+    performSubstitution (Λ (x :-: σ) t) var term
+        | x /= var = Λ (x :-: σ) <$> performSubstitution t var term
+        | otherwise = Just $ Λ (x :-: σ) t
+    performSubstitution (ΛT p t) var term
+        | p /= var = ΛT p <$> performSubstitution t var term
+        | otherwise = Just $ ΛT p t
+    performSubstitution (App x y) var term = App <$> performSubstitution x var term <*> performSubstitution y var term
+
 instance ΛCalculus Λ where
     type Variable Λ = ΛVariable
 
@@ -50,12 +94,6 @@ instance ΛCalculus Λ where
     prettyΛ (App x y@(Var _)) = prettyΛ x ++ prettyΛ y
     prettyΛ (App x y) = prettyΛ x ++ "(" ++ prettyΛ y ++ ")"
 
-    freeVariables :: Λ -> Set (VariableName Λ)
-    freeVariables (Var (x :-: σ)) = insert x $ freeTypeVariables σ
-    freeVariables (Λ (x :-: _) term) = delete x $ freeVariables term
-    freeVariables (ΛT p term) = delete p $ freeVariables term
-    freeVariables (App x y) = freeVariables x `union` freeVariables y
-
     αEquiv :: Λ -> Λ -> EquivalenceContext Λ -> Bool
     αEquiv (Var (x :-: σ)) (Var (y :-: τ)) context
         = typesEquivalent σ τ context && (x == y || (x, y) `elem` context)
@@ -77,50 +115,13 @@ instance ΛCalculus Λ where
     αEquiv (App x1 x2) (App y1 y2) context = αEquiv x1 y1 context && αEquiv x2 y2 context
     αEquiv _ _ _ = False
 
-    renameVariable :: Λ -> VariableName Λ -> VariableName Λ -> Λ
-    renameVariable (Var (x :-: σ)) old new
-        | x == old = Var (new :-: renameType σ old new)
-        | otherwise = Var (x :-: renameType σ old new)
-    renameVariable (Λ (x :-: σ) term) old new
-        | x == old = Λ (new :-: renameType σ old new) $ renameVariable term old new
-        | otherwise = Λ (x :-: renameType σ old new) $ renameVariable term old new
-    renameVariable (ΛT p term) old new
-        | p == old = ΛT new $ renameVariable term old new
-        | otherwise = ΛT p $ renameVariable term old new
-    renameVariable (App x y) old new = App (renameVariable x old new) (renameVariable y old new)
-
-    prepareSubstitution :: Λ -> VariableName Λ -> Λ
-    prepareSubstitution (Λ (x :-: σ) term) var
-        | x /= var = Λ (x :-: makeTypeSafeFor σ var) $ prepareSubstitution term var
-        | otherwise = Λ (newName :-: makeTypeSafeFor σ var) $ prepareSubstitution (renameVariable term x newName) var
-        where newName = "_" ++ var
-    prepareSubstitution (ΛT p term) var
-        | p /= var = ΛT p $ prepareSubstitution term var
-        | otherwise = ΛT newName $ prepareSubstitution (renameVariable term p newName) var
-        where newName = "_" ++ var
-    prepareSubstitution (App x y) var = App (prepareSubstitution x var) (prepareSubstitution y var)
-    prepareSubstitution (Var (x :-: σ)) var = Var (x :-: makeTypeSafeFor σ var)
-
-    performSubstitute :: Λ -> VariableName Λ -> Λ -> Maybe Λ
-    performSubstitute (Var (x :-: σ)) var term
-        | x /= var = Just $ Var (x :-: σ)
-        | typeOf term /= Just σ = Nothing
-        | otherwise = Just term
-    performSubstitute (Λ (x :-: σ) t) var term
-        | x /= var = Λ (x :-: σ) <$> performSubstitute t var term
-        | otherwise = Just $ Λ (x :-: σ) t
-    performSubstitute (ΛT p t) var term
-        | p /= var = ΛT p <$> performSubstitute t var term
-        | otherwise = Just $ ΛT p t
-    performSubstitute (App x y) var term = App <$> performSubstitute x var term <*> performSubstitute y var term
-
     βReductions :: Λ -> [Λ]
     βReductions (App (Λ (x :-: σ) term) n) = [fromJust substitution | isJust substitution ] ++ reduceTerm ++ reduceApp
         where
             reduceTerm = (\newTerm -> App (Λ (x :-: σ) newTerm) n) <$> βReductions term
             reduceApp = App (Λ (x :-: σ) term) <$> βReductions n
             substitution = substitute term x n
-    βReductions (App (ΛT p term) (Var (q :-: Type))) = substitution : reduceTerm
+    βReductions (App (ΛT p term) (Var (q :-: Type))) = [fromJust substitution | isJust substitution] ++ reduceTerm
         where
             reduceTerm = (\newTerm -> App (ΛT p newTerm) (Var (q :-: Type))) <$> βReductions term
             substitution = substituteTypes term p (Pure q)
@@ -128,6 +129,51 @@ instance ΛCalculus Λ where
     βReductions (Λ x term) = Λ x <$> βReductions term
     βReductions (ΛT p term) = ΛT p <$> βReductions term
     βReductions (App x y) = ((`App` y) <$> βReductions x) ++ (App x <$> βReductions y)
+
+instance Substitutable (Type Λ) String where
+    freeVariables :: Type Λ -> Set (VariableName Λ)
+    freeVariables (Pure σ) = singleton σ
+    freeVariables (σ :-> τ) = freeVariables σ `union` freeVariables τ
+    freeVariables (Forall p τ) = delete p $ freeVariables τ
+    freeVariables Perp = empty
+    freeVariables Null = empty
+    freeVariables Type = empty
+
+    renameVariable :: Type Λ -> VariableName Λ -> VariableName Λ -> Type Λ
+    renameVariable (Pure σ) old new
+        | σ /= old = Pure σ
+        | otherwise = Pure new
+    renameVariable (σ :-> τ) old new = renameVariable σ old new :-> renameVariable τ old new
+    renameVariable (Forall p τ) old new
+        | p /= old = Forall p $ renameVariable τ old new
+        | p == old = Forall p τ
+    renameVariable σ _ _ = σ
+
+    prepareSubstitution :: Type Λ -> VariableName Λ -> Type Λ
+    prepareSubstitution (σ :-> τ) var = prepareSubstitution σ var :-> prepareSubstitution τ var
+    prepareSubstitution (Forall p τ) var
+        | p /= var = Forall p $ prepareSubstitution τ var
+        | otherwise = Forall newName $ prepareSubstitution (renameVariable τ p newName) var
+        where newName = "_" ++ var
+    prepareSubstitution σ _ = σ
+
+    performSubstitution :: Type Λ -> VariableName Λ -> Type Λ -> Maybe (Type Λ)
+    performSubstitution (Pure σ) var term
+        | σ /= var = Just $ Pure σ
+        | otherwise = Just term
+    performSubstitution (σ :-> τ) var term = (:->) <$> performSubstitution σ var term <*> performSubstitution τ var term
+    performSubstitution (Forall p t) var term
+        | p /= var = Forall p <$> performSubstitution t var term
+        | otherwise = Just $ Forall p t
+    performSubstitution σ _ _ = Just σ
+
+substituteTypes :: Λ -> VariableName Λ -> Type Λ -> Maybe Λ
+substituteTypes (Var (x :-: σ)) var term = Var <$> ((x :-:) <$> substitute σ var term)
+substituteTypes (Λ (x :-: σ) t) var term = Λ <$> ((x :-:) <$> substitute σ var term) <*> substituteTypes t var term
+substituteTypes (ΛT p t) var term
+ | p /= var = ΛT p <$> substituteTypes t var term
+ | otherwise = Just $ ΛT p t
+substituteTypes (App x y) var term = App <$> substituteTypes x var term <*> substituteTypes y var term
 
 instance TypedΛCalculus Λ where
     data Type Λ = Pure (VariableName Λ) | (Type Λ) :-> (Type Λ) | Forall (VariableName Λ) (Type Λ) | Perp | Null | Type
@@ -148,8 +194,8 @@ instance TypedΛCalculus Λ where
     typesEquivalent (Forall p σ) (Forall q τ) context
         = notCrossBound && typesEquivalent σ τ ((p, q) : context)
         where
-            qFreeInΣ = q `elem` freeTypeVariables σ
-            pFreeInτ = p `elem` freeTypeVariables τ
+            qFreeInΣ = q `elem` freeVariables σ
+            pFreeInτ = p `elem` freeVariables τ
             notCrossBound = p == q || (not qFreeInΣ && not pFreeInτ)
     typesEquivalent Perp Perp _ = True
     typesEquivalent Type Type _ = True
@@ -163,7 +209,7 @@ instance TypedΛCalculus Λ where
         = forallType =<< typeOf x
         where
             forallType :: Type Λ -> Maybe (Type Λ)
-            forallType (Forall p t) = Just $ substituteType t p (Pure y)
+            forallType (Forall p t) = substitute t p (Pure y)
             forallType _ = Nothing
 
     typeOf (App x y)
@@ -172,16 +218,6 @@ instance TypedΛCalculus Λ where
             functionType :: Type Λ -> Type Λ -> Maybe (Type Λ)
             functionType (σ :-> τ) υ | σ == υ = Just τ
             functionType _ _ = Nothing
-
-    renameType :: Type Λ -> VariableName Λ -> VariableName Λ -> Type Λ
-    renameType (Pure σ) old new
-        | σ /= old = Pure σ
-        | otherwise = Pure new
-    renameType (x :-> y) old new = renameType x old new :-> renameType y old new
-    renameType (Forall p τ) old new
-        | p /= old = Forall p $ renameType τ old new
-        | p == old = Forall p τ
-    renameType σ _ _ = σ
 
     deduceTypes :: Λ -> TypeMapping Λ -> Λ
     deduceTypes (Var (x :-: Null)) types
@@ -284,38 +320,5 @@ infixl 6 :::
 toVariable :: TypeableVariable -> Variable Λ
 toVariable (x ::: t) = x :-: toType t
 
-freeTypeVariables :: Type Λ -> Set (VariableName Λ)
-freeTypeVariables (Pure x) = singleton x
-freeTypeVariables (x :-> y) = freeTypeVariables x `union` freeTypeVariables y
-freeTypeVariables (Forall x t) = delete x $ freeTypeVariables t
-freeTypeVariables Perp = empty
-freeTypeVariables Null = empty
-freeTypeVariables Type = empty
-
-makeTypeSafeFor :: Type Λ -> VariableName Λ -> Type Λ
-makeTypeSafeFor (x :-> y) var = makeTypeSafeFor x var :-> makeTypeSafeFor y var
-makeTypeSafeFor (Forall p t) var
- | p /= var = Forall p $ makeTypeSafeFor t var
- | otherwise = Forall newName $ makeTypeSafeFor (renameType t p newName) var
- where newName = "_" ++ var
-makeTypeSafeFor t _ = t
-
-substituteType :: Type Λ -> VariableName Λ -> Type Λ -> Type Λ
-substituteType (Pure x) var t
- | x /= var = Pure x
- | otherwise = t
-substituteType (x :-> y) var t = substituteType x var t :-> substituteType y var t
-substituteType (Forall p x) var t
- | p /= var = Forall p $ substituteType x var t
- | otherwise = Forall p x
-substituteType x _ _ = x
-
-substituteTypes :: Λ -> VariableName Λ -> Type Λ -> Λ
-substituteTypes (Var (x :-: s)) var t = Var (x :-: substituteType s var t)
-substituteTypes (Λ (x :-: s) term) var t = Λ (x :-: substituteType s var t) $ substituteTypes term var t
-substituteTypes (ΛT p term) var t
- | p /= var = ΛT p $ substituteTypes term var t
- | otherwise = ΛT p term
-substituteTypes (App x y) var t = App (substituteTypes x var t) (substituteTypes y var t)
 
 \end{code}

@@ -22,42 +22,11 @@ type Lambda = Λ
 infixr 7 :->
 infixl 6 :-:
 
-instance ΛCalculus Λ where
-    type Variable Λ = ΛVariable
-
-    fromVar = Var
-    fromVarName name = Var (name :-: Null)
-    fromΛ = Λ
-    fromApp = App
-
-    prettyΛ :: Λ -> String
-    prettyΛ (Var (x :-: Null)) = x
-    prettyΛ (Var (x :-: σ)) = "(" ++ x ++ ":" ++ prettyType σ ++ ")"
-    prettyΛ (Λ (x :-: σ) term@(Λ _ _)) = "λ" ++ x ++ ":" ++ prettyType σ ++ "," ++ tail (prettyΛ term)
-    prettyΛ (Λ (x :-: σ) term) = "λ" ++ x ++ ":" ++ prettyType σ ++ "." ++ prettyΛ term
-    prettyΛ (App x@(Λ _ _) y@(Var _)) = "(" ++ prettyΛ x ++ ")" ++ prettyΛ y
-    prettyΛ (App x@(Λ _ _) y) = "(" ++ prettyΛ x ++ ")(" ++ prettyΛ y ++ ")"
-    prettyΛ (App x y@(Var _)) = prettyΛ x ++ prettyΛ y
-    prettyΛ (App x y) = prettyΛ x ++ "(" ++ prettyΛ y ++ ")"
-
+instance Substitutable Λ String where
     freeVariables :: Λ -> Set (VariableName Λ)
     freeVariables (Var (x :-: _)) = singleton x
     freeVariables (Λ (x :-: _) term) = delete x $ freeVariables term
     freeVariables (App x y) = freeVariables x `union` freeVariables y
-
-    αEquiv :: Λ -> Λ -> EquivalenceContext Λ -> Bool
-    αEquiv (Var (x :-: σ)) (Var (y :-: τ)) context
-        = σ == τ && (x == y || (x, y) `elem` context)
-
-    αEquiv (Λ (x :-: σ) xTerm) (Λ (y :-: τ) yTerm) context
-        = notCrossBound && σ == τ && αEquiv xTerm yTerm ((x, y) : context)
-        where
-            yFreeInX = y `elem` freeVariables xTerm
-            xFreeInY = x `elem` freeVariables yTerm
-            notCrossBound = x == y || (not yFreeInX && not xFreeInY)
-
-    αEquiv (App x1 x2) (App y1 y2) context = αEquiv x1 y1 context && αEquiv x2 y2 context
-    αEquiv _ _ _ = False
 
     renameVariable :: Λ -> VariableName Λ -> VariableName Λ -> Λ
     renameVariable (Var (x :-: σ)) old new
@@ -76,15 +45,47 @@ instance ΛCalculus Λ where
     prepareSubstitution (App x y) var = App (prepareSubstitution x var) (prepareSubstitution y var)
     prepareSubstitution var _ = var
 
-    performSubstitute :: Λ -> VariableName Λ -> Λ -> Maybe Λ
-    performSubstitute (Var (x :-: σ)) var term
+    performSubstitution :: Λ -> VariableName Λ -> Λ -> Maybe Λ
+    performSubstitution (Var (x :-: σ)) var term
         | x /= var = Just $ Var (x :-: σ)
         | typeOf term /= Just σ = Nothing
         | otherwise = Just term
-    performSubstitute (Λ (x :-: σ) t) var term
-        | x /= var = Λ (x :-: σ) <$> performSubstitute t var term
+    performSubstitution (Λ (x :-: σ) t) var term
+        | x /= var = Λ (x :-: σ) <$> performSubstitution t var term
         | otherwise = Just $ Λ (x :-: σ) t
-    performSubstitute (App x y) var term = App <$> performSubstitute x var term <*> performSubstitute y var term
+    performSubstitution (App x y) var term = App <$> performSubstitution x var term <*> performSubstitution y var term
+
+instance ΛCalculus Λ where
+    type Variable Λ = ΛVariable
+
+    fromVar = Var
+    fromVarName name = Var (name :-: Null)
+    fromΛ = Λ
+    fromApp = App
+
+    prettyΛ :: Λ -> String
+    prettyΛ (Var (x :-: Null)) = x
+    prettyΛ (Var (x :-: σ)) = "(" ++ x ++ ":" ++ prettyType σ ++ ")"
+    prettyΛ (Λ (x :-: σ) term@(Λ _ _)) = "λ" ++ x ++ ":" ++ prettyType σ ++ "," ++ tail (prettyΛ term)
+    prettyΛ (Λ (x :-: σ) term) = "λ" ++ x ++ ":" ++ prettyType σ ++ "." ++ prettyΛ term
+    prettyΛ (App x@(Λ _ _) y@(Var _)) = "(" ++ prettyΛ x ++ ")" ++ prettyΛ y
+    prettyΛ (App x@(Λ _ _) y) = "(" ++ prettyΛ x ++ ")(" ++ prettyΛ y ++ ")"
+    prettyΛ (App x y@(Var _)) = prettyΛ x ++ prettyΛ y
+    prettyΛ (App x y) = prettyΛ x ++ "(" ++ prettyΛ y ++ ")"
+
+    αEquiv :: Λ -> Λ -> EquivalenceContext Λ -> Bool
+    αEquiv (Var (x :-: σ)) (Var (y :-: τ)) context
+        = σ == τ && (x == y || (x, y) `elem` context)
+
+    αEquiv (Λ (x :-: σ) xTerm) (Λ (y :-: τ) yTerm) context
+        = notCrossBound && σ == τ && αEquiv xTerm yTerm ((x, y) : context)
+        where
+            yFreeInX = y `elem` freeVariables xTerm
+            xFreeInY = x `elem` freeVariables yTerm
+            notCrossBound = x == y || (not yFreeInX && not xFreeInY)
+
+    αEquiv (App x1 x2) (App y1 y2) context = αEquiv x1 y1 context && αEquiv x2 y2 context
+    αEquiv _ _ _ = False
 
     βReductions :: Λ -> [Λ]
     βReductions (App (Λ (x :-: σ) term) n) = [fromJust substitution | isJust substitution] ++ reduceTerm ++ reduceApp
@@ -119,13 +120,6 @@ instance TypedΛCalculus Λ where
             functionType :: Type Λ -> Type Λ -> Maybe (Type Λ)
             functionType (σ :-> τ) υ | σ == υ = Just τ
             functionType _ _ = Nothing
-
-    renameType :: Type Λ -> VariableName Λ -> VariableName Λ -> Type Λ
-    renameType (Pure σ) old new
-     | σ /= old  = Pure σ
-     | otherwise = Pure new
-    renameType (σ :-> τ) old new = renameType σ old new :-> renameType τ old new
-    renameType σ _ _ = σ
 
     deduceTypes :: Λ -> TypeMapping Λ -> Λ
     deduceTypes (Var (x :-: Null)) types
