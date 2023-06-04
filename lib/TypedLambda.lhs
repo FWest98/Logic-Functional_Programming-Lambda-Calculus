@@ -6,9 +6,10 @@ module TypedLambda (
     Λ, Lambda,
     λ, l, (-->), ($$), (==>), TypeableVariable((:::))
 ) where
+
 -- Imports
 import Lambda
-import Helpers (lookupSet)
+import Helpers (lookupSet, lookupSetReverse)
 import Data.Maybe (isJust, fromJust, isNothing)
 import Data.Set (Set, delete, union, singleton, insert, filter)
 import Control.Monad
@@ -24,22 +25,22 @@ infixl 6 :-:
 
 instance Substitutable Λ String where
     freeVariables :: Λ -> Set (VariableName Λ)
-    freeVariables (Var (x :-: _)) = singleton x
+    freeVariables (Var (x :-: _))    = singleton x
     freeVariables (Λ (x :-: _) term) = delete x $ freeVariables term
-    freeVariables (App x y) = freeVariables x `union` freeVariables y
+    freeVariables (App x y)          = freeVariables x `union` freeVariables y
 
     renameVariable :: Λ -> VariableName Λ -> VariableName Λ -> Λ
     renameVariable (Var (x :-: σ)) old new
-        | x == old = Var (new :-: σ)
-        | otherwise = Var (x :-: σ)
+        | x == old  = Var (new :-: σ)
+        | otherwise = Var (x   :-: σ)
     renameVariable (Λ (x :-: σ) term) old new
-        | x == old = Λ (new :-: σ) $ renameVariable term old new
-        | otherwise = Λ (x :-: σ) $ renameVariable term old new
+        | x == old  = Λ (new :-: σ) $ renameVariable term old new
+        | otherwise = Λ (x   :-: σ) $ renameVariable term old new
     renameVariable (App x y) old new = App (renameVariable x old new) (renameVariable y old new)
 
     prepareSubstitution :: Λ -> VariableName Λ -> Λ
     prepareSubstitution (Λ (x :-: σ) term) var
-        | x /= var  = Λ (x :-: σ) $ prepareSubstitution term var
+        | x /= var  = Λ (x       :-: σ) $ prepareSubstitution term var
         | otherwise = Λ (newName :-: σ) $ prepareSubstitution (renameVariable term x newName) var
         where newName = "_" ++ x
     prepareSubstitution (App x y) var = App (prepareSubstitution x var) (prepareSubstitution y var)
@@ -47,12 +48,12 @@ instance Substitutable Λ String where
 
     performSubstitution :: Λ -> VariableName Λ -> Λ -> Maybe Λ
     performSubstitution (Var (x :-: σ)) var term
-        | x /= var = Just $ Var (x :-: σ)
+        | x /= var              = Just $ Var (x :-: σ)
         | typeOf term /= Just σ = Nothing
-        | otherwise = Just term
+        | otherwise             = Just term
     performSubstitution (Λ (x :-: σ) t) var term
-        | x /= var = Λ (x :-: σ) <$> performSubstitution t var term
-        | otherwise = Just $ Λ (x :-: σ) t
+        | x /= var              = Λ (x :-: σ) <$> performSubstitution t var term
+        | otherwise             = Just $ Λ (x :-: σ) t
     performSubstitution (App x y) var term = App <$> performSubstitution x var term <*> performSubstitution y var term
 
 instance ΛCalculus Λ where
@@ -64,14 +65,14 @@ instance ΛCalculus Λ where
     fromApp = App
 
     prettyΛ :: Λ -> String
-    prettyΛ (Var (x :-: Null)) = x
-    prettyΛ (Var (x :-: σ)) = "(" ++ x ++ ":" ++ prettyType σ ++ ")"
+    prettyΛ (Var (x :-: Null))         = x
+    prettyΛ (Var (x :-: σ))            = "(" ++ x ++ ":" ++ prettyType σ ++ ")"
     prettyΛ (Λ (x :-: σ) term@(Λ _ _)) = "λ" ++ x ++ ":" ++ prettyType σ ++ "," ++ tail (prettyΛ term)
-    prettyΛ (Λ (x :-: σ) term) = "λ" ++ x ++ ":" ++ prettyType σ ++ "." ++ prettyΛ term
-    prettyΛ (App x@(Λ _ _) y@(Var _)) = "(" ++ prettyΛ x ++ ")" ++ prettyΛ y
-    prettyΛ (App x@(Λ _ _) y) = "(" ++ prettyΛ x ++ ")(" ++ prettyΛ y ++ ")"
-    prettyΛ (App x y@(Var _)) = prettyΛ x ++ prettyΛ y
-    prettyΛ (App x y) = prettyΛ x ++ "(" ++ prettyΛ y ++ ")"
+    prettyΛ (Λ (x :-: σ) term)         = "λ" ++ x ++ ":" ++ prettyType σ ++ "." ++ prettyΛ term
+    prettyΛ (App x@(Λ _ _) y@(Var _))  = "(" ++ prettyΛ x ++ ")"  ++ prettyΛ y
+    prettyΛ (App x@(Λ _ _) y)          = "(" ++ prettyΛ x ++ ")(" ++ prettyΛ y ++ ")"
+    prettyΛ (App x y@(Var _))          = prettyΛ x     ++    prettyΛ y
+    prettyΛ (App x y)                  = prettyΛ x ++ "(" ++ prettyΛ y ++ ")"
 
     αEquiv :: Λ -> Λ -> EquivalenceContext Λ -> Bool
     αEquiv (Var (x :-: σ)) (Var (y :-: τ)) context
@@ -90,32 +91,31 @@ instance ΛCalculus Λ where
     βReductions :: Λ -> [Λ]
     βReductions (App (Λ (x :-: σ) term) n) = [fromJust substitution | isJust substitution] ++ reduceTerm ++ reduceApp
         where
-            reduceTerm = (\newTerm -> App (Λ (x :-: σ) newTerm) n) <$> βReductions term
-            reduceApp = App (Λ (x :-: σ) term) <$> βReductions n
+            reduceTerm  = (\newTerm -> App (Λ (x :-: σ) newTerm) n) <$> βReductions term
+            reduceApp   = App (Λ (x :-: σ) term) <$> βReductions n
             substitution = substitute term x n
-    βReductions (Var _) = []
+    βReductions (Var _)    = []
     βReductions (Λ x term) = Λ x <$> βReductions term
-    βReductions (App x y) = ((`App` y) <$> βReductions x) ++ (App x <$> βReductions y)
+    βReductions (App x y)  = ((`App` y) <$> βReductions x) ++ (App x <$> βReductions y)
 
 instance TypedΛCalculus Λ where
     data Type Λ = Pure (VariableName Λ) | (Type Λ) :-> (Type Λ) | Perp | Null
         deriving (Show, Eq, Ord)
 
     prettyType :: Type Λ -> String
-    prettyType (Pure σ) = σ
-    prettyType (σ@(Pure _) :-> τ) = prettyType σ ++ "->" ++ prettyType τ
-    prettyType (σ :-> τ) = "(" ++ prettyType σ ++ ")->" ++ prettyType τ
-    prettyType Null = "?"
-    prettyType Perp = "⟂"
+    prettyType (Pure σ)           = σ
+    prettyType (σ@(Pure _) :-> τ) =        prettyType σ ++  "->" ++ prettyType τ
+    prettyType (σ :-> τ)          = "(" ++ prettyType σ ++ ")->" ++ prettyType τ
+    prettyType Null               = "?"
+    prettyType Perp               = "⟂"
 
     typesEquivalent :: Type Λ -> Type Λ -> EquivalenceContext Λ -> Bool
     typesEquivalent x y _ = x == y
 
     typeOf :: Λ -> Maybe (Type Λ)
-    typeOf (Var (_ :-: σ)) = Just σ
+    typeOf (Var (_ :-: σ))    = Just σ
     typeOf (Λ (_ :-: σ) term) = (σ :->) <$> typeOf term
-    typeOf (App x y)
-        = join $ functionType <$> typeOf x <*> typeOf y
+    typeOf (App x y)          = join $ functionType <$> typeOf x <*> typeOf y
         where
             functionType :: Type Λ -> Type Λ -> Maybe (Type Λ)
             functionType (σ :-> τ) υ | σ == υ = Just τ
@@ -134,41 +134,41 @@ instance TypedΛCalculus Λ where
         | fromJust mappedType == σ  = App deduceX (Var (x :-: σ))
         | otherwise                 = App deduceX (Var (x :-: Null))
         where
-            mappedType = lookupSet x types
-            functionType = typeOf deduceX
-            isFunction = isJust functionType && case fromJust functionType of
+            mappedType     = lookupSet x types
+            functionType   = typeOf deduceX
+            isFunction     = isJust functionType && case fromJust functionType of
                                                     (_ :-> _) -> True
                                                     _ -> False
             Just (σ :-> _) = functionType
-            deduceX = deduceTypes xTerm types
+            deduceX        = deduceTypes xTerm types
 
     deduceTypes (App x y) types = App (deduceTypes x types) (deduceTypes y types)
 
     hasValidType :: Λ -> TypeMapping Λ -> Bool
-    hasValidType (Var (x :-: σ)) vars = (x, σ) `elem` vars
+    hasValidType (Var (x :-: σ)) vars    = (x, σ) `elem` vars
     hasValidType (Λ (x :-: σ) term) vars = hasValidType term (insert (x, σ) $ Data.Set.filter (\(y, _) -> x /= y) vars)
-    hasValidType t@(App x y) vars = hasValidType x vars && hasValidType y vars && isJust (typeOf t)
+    hasValidType t@(App x y) vars        = hasValidType x vars && hasValidType y vars && isJust (typeOf t)
 
 class ΛParameters a where
-  toΛparameters :: [Variable Λ] -> a
+    toΛparameters :: [Variable Λ] -> a
 
 instance ΛParameters (Λ -> Λ) where
-  toΛparameters [] = error "No Λ-parameters supplied"
-  toΛparameters [x] = Λ x
-  toΛparameters (x:xs) = Λ x . toΛparameters xs
+    toΛparameters [] = error "No Λ-parameters supplied"
+    toΛparameters [x] = Λ x
+    toΛparameters (x:xs) = Λ x . toΛparameters xs
 
 instance (ΛParameters a) => ΛParameters (ΛVariable -> a) where
-  toΛparameters xs x = toΛparameters (xs ++ [x])
+    toΛparameters xs x = toΛparameters (xs ++ [x])
 
 instance (ΛParameters a) => ΛParameters (TypeableVariable -> a) where
-  toΛparameters xs x = toΛparameters (xs ++ [toVariable x])
+    toΛparameters xs x = toΛparameters (xs ++ [toVariable x])
 
 λ, l :: ΛParameters a => a
 l = λ
 λ = toΛparameters []
 
 class Typeable a where
-  toType :: a -> Type Λ
+    toType :: a -> Type Λ
 
 instance Typeable (Type Λ) where toType = id
 instance Typeable String where toType = Pure
@@ -178,10 +178,10 @@ a ==> b = toType a :-> toType b
 infixr 7 ==>
 
 class ΛTerm a where
-  toΛ :: a -> Λ
+    toΛ :: a -> Λ
 
-instance ΛTerm Λ where toΛ = id
-instance ΛTerm String where toΛ s = Var (s :-: Null)
+instance ΛTerm Λ                where toΛ = id
+instance ΛTerm String           where toΛ = fromVarName
 instance ΛTerm TypeableVariable where toΛ = Var . toVariable
 
 (-->) :: ΛTerm a => (Λ -> Λ) -> a -> Λ
@@ -193,7 +193,7 @@ x $$ y = App (toΛ x) (toΛ y)
 infixl 6 $$
 
 data TypeableVariable where
-  (:::) :: Typeable a => VariableName Λ -> a -> TypeableVariable
+    (:::) :: Typeable a => VariableName Λ -> a -> TypeableVariable
 infixl 6 :::
 
 toVariable :: TypeableVariable -> Variable Λ

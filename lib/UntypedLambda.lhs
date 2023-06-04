@@ -32,31 +32,30 @@ import Lambda
 import Data.Maybe (isJust, fromJust)
 
 -- Main defintions of lambda terms
-type ΛVariable = String
-data Λ = Var ΛVariable | Λ ΛVariable Λ | App Λ Λ
+data Λ = Var (Variable Λ) | Λ (Variable Λ) Λ | App Λ Λ
     deriving (Show)
 type Lambda = Λ
 
 instance Substitutable Λ String where
     -- Determining the set of free variables
-    freeVariables :: Λ -> Set ΛVariable
-    freeVariables (Var x) = singleton x
+    freeVariables :: Λ -> Set (Variable Λ)
+    freeVariables (Var x)    = singleton x
     freeVariables (Λ x term) = delete x $ freeVariables term
-    freeVariables (App x y) = freeVariables x `union` freeVariables y
+    freeVariables (App x y)  = freeVariables x `union` freeVariables y
 
     -- Performing a substitution
     renameVariable :: Λ -> VariableName Λ -> VariableName Λ -> Λ
     renameVariable (Var x) old new
-        | x == old = Var new
+        | x == old  = Var new
         | otherwise = Var x
     renameVariable (Λ x term) old new
-        | x == old = Λ new $ renameVariable term old new
-        | otherwise = Λ x $ renameVariable term old new
+        | x == old  = Λ new $ renameVariable term old new
+        | otherwise = Λ x   $ renameVariable term old new
     renameVariable (App x y) old new = App (renameVariable x old new) (renameVariable y old new)
 
     prepareSubstitution :: Λ -> VariableName Λ -> Λ
     prepareSubstitution (Λ x term) var
-        | x /= var  = Λ x $ prepareSubstitution term var
+        | x /= var  = Λ x       $ prepareSubstitution term var
         | otherwise = Λ newName $ prepareSubstitution (renameVariable term x newName) var
         where newName = "_" ++ x
     prepareSubstitution (App x y) var = App (prepareSubstitution x var) (prepareSubstitution y var)
@@ -64,15 +63,15 @@ instance Substitutable Λ String where
 
     performSubstitution :: Λ -> Variable Λ -> Λ -> Maybe Λ
     performSubstitution (Var x) var term
-        | x == var = Just term
+        | x == var  = Just term
         | otherwise = Just $ Var x
     performSubstitution (Λ x t) var term
-        | x == var = Just $ Λ x t
+        | x == var  = Just $ Λ x t
         | otherwise = Λ x <$> performSubstitution t var term
     performSubstitution (App x y) var term = App <$> performSubstitution x var term <*> performSubstitution y var term
 
 instance ΛCalculus Λ where
-    type Variable Λ = ΛVariable
+    type Variable Λ = String
 
     fromVar = Var
     fromVarName = Var
@@ -82,23 +81,22 @@ instance ΛCalculus Λ where
     -- Pretty printing
     prettyΛ :: Λ -> String
     prettyΛ (Var x) = x
-    prettyΛ (Λ x term@(Λ _ _)) = "λ" ++ x ++ tail (prettyΛ term)
-    prettyΛ (Λ x term) = "λ" ++ x ++ "." ++ prettyΛ term
-    prettyΛ (App x@(Λ _ _) y@(Var _)) = "(" ++ prettyΛ x ++ ")" ++ prettyΛ y
-    prettyΛ (App x@(Λ _ _) y) = "(" ++ prettyΛ x ++ ")(" ++ prettyΛ y ++ ")"
-    prettyΛ (App x y@(Var _)) = prettyΛ x ++ prettyΛ y
-    prettyΛ (App x y) = prettyΛ x ++ "(" ++ prettyΛ y ++ ")"
+    prettyΛ (Λ x term@(Λ _ _))        = "λ" ++ x ++  tail (prettyΛ term)
+    prettyΛ (Λ x term)                = "λ" ++ x ++ "." ++ prettyΛ term
+    prettyΛ (App x@(Λ _ _) y@(Var _)) = "(" ++ prettyΛ x ++ ")"  ++ prettyΛ y
+    prettyΛ (App x@(Λ _ _) y)         = "(" ++ prettyΛ x ++ ")(" ++ prettyΛ y ++ ")"
+    prettyΛ (App x y@(Var _))         = prettyΛ x    ++     prettyΛ y
+    prettyΛ (App x y)                 = prettyΛ x ++ "(" ++ prettyΛ y ++ ")"
 
     -- Defining the α-equivalence between pre-terms
-    αEquiv :: Λ -> Λ -> [(ΛVariable, ΛVariable)] -> Bool
-    αEquiv (Var x) (Var y) context = x == y || (x, y) `elem` context
-    αEquiv (Λ x xTerm) (Λ y yTerm) context = notCrossBound && αEquiv xTerm yTerm ((x, y) : context)
+    αEquiv :: Λ -> Λ -> [(Variable Λ, Variable Λ)] -> Bool
+    αEquiv (Var x) (Var y) context          = x == y || (x, y) `elem` context
+    αEquiv (Λ x xTerm) (Λ y yTerm) context  = notCrossBound && αEquiv xTerm yTerm ((x, y) : context)
         where
             yFreeInX = y `elem` freeVariables xTerm
             xFreeInY = x `elem` freeVariables yTerm
             notCrossBound = x == y || (not yFreeInX && not xFreeInY)
-
-    αEquiv (App x1 x2) (App y1 y2) context = αEquiv x1 y1 context && αEquiv x2 y2 context
+    αEquiv (App x1 x2) (App y1 y2) context  = αEquiv x1 y1 context && αEquiv x2 y2 context
     αEquiv _ _ _ = False
 
     -- Perform one of each possible β-redex in the lambda term
@@ -108,19 +106,20 @@ instance ΛCalculus Λ where
             reduceTerm = (\newTerm -> App (Λ x newTerm) n) <$> βReductions term
             reduceApp = App (Λ x term) <$> βReductions n
             substitution = substitute term x n
-    βReductions (Var _) = []
+    βReductions (Var _)    = []
     βReductions (Λ x term) = Λ x <$> βReductions term
-    βReductions (App x y) = ((`App` y) <$> βReductions x) ++ (App x <$> βReductions y)
+    βReductions (App x y)  = ((`App` y) <$> βReductions x) ++ (App x <$> βReductions y)
 
 -- Helper functions for notation
 class ΛParameters a where
-    toΛparameters :: [ΛVariable] -> a
+    toΛparameters :: [Variable Λ] -> a
 
 instance ΛParameters (Λ -> Λ) where
     toΛparameters [] = error "No Λ-parameters supplied"
-    toΛparameters xs = \λbody -> foldr fromΛ λbody xs
+    toΛparameters [x] = Λ x
+    toΛparameters (x:xs) = Λ x . toΛparameters xs
 
-instance (ΛParameters a) => ΛParameters (ΛVariable -> a) where
+instance (ΛParameters a) => ΛParameters (String -> a) where
     toΛparameters xs x = toΛparameters (xs ++ [x])
 
 λ,l :: ΛParameters a => a
@@ -130,8 +129,8 @@ l = λ
 class ΛTerm a where
     toΛ :: a -> Λ
 
-instance ΛTerm Λ where toΛ = id
-instance ΛTerm ΛVariable where toΛ = fromVarName
+instance ΛTerm Λ      where toΛ = id
+instance ΛTerm String where toΛ = fromVarName
 
 (-->) :: (ΛTerm a) => (Λ -> Λ) -> a -> Λ
 a --> b = a (toΛ b)

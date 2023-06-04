@@ -48,10 +48,10 @@ import UntypedLambda
 church :: Int -> Λ
 church 0 = λ "f" "x" --> "x"
 church n = λ "f" "x" --> fs n
-  where
-    fs :: Int -> Λ
-    fs 1 = "f" $$ "x"
-    fs m = "f" $$ fs (m - 1)
+    where
+        fs :: Int -> Λ
+        fs 1 = "f" $$ "x"
+        fs m = "f" $$ fs (m - 1)
 
 λsucc, λadd, λmult, λexp, λzero :: Λ
 λsucc = λ "n" "f" "x" --> "f" $$ ("n" $$ "f" $$ "x")
@@ -75,6 +75,6 @@ church n = λ "f" "x" --> fs n
 -- Predecessor function
 λpred :: Λ
 λpred = λ "x" --> λp1 $$ (λQ $$ "x")
-  where λQ = λit $$ (λpair $$ church 0 $$ church 0) $$ (λ"x" --> (λpair $$ (λp2 $$ "x") $$ (λsucc $$ (λp2 $$ "x"))))
+    where λQ = λit $$ (λpair $$ church 0 $$ church 0) $$ (λ"x" --> (λpair $$ (λp2 $$ "x") $$ (λsucc $$ (λp2 $$ "x"))))
 
 \end{code}
