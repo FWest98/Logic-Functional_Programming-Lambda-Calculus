@@ -14,13 +14,13 @@ build-type:     Simple
 
 library
   exposed-modules:
-      Basics
       Lambda
-      LambdaTerms
       PolymorphicLambda
       PolymorphicLambdaTerms
       TypedLambda
       TypedLambdaTerms
+      UntypedLambda
+      UntypedLambdaTerms
   other-modules:
       Paths_lambda_calculus
   hs-source-dirs:

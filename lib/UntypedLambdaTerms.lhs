@@ -10,7 +10,7 @@ the lambda calculus implemented in this library.
 
 module LambdaTerms where
 
-import Lambda
+import UntypedLambda
 
 -- Common lambda terms
 λI, λK, λS, λΩ, λY :: Λ
@@ -38,7 +38,7 @@ import Lambda
 
 -- Pairs and two pair accessors
 λpair :: Λ
-λpair = λ "x" --> "x"
+λpair = λ "x" "y" "f" --> "f" $$ "x" $$ "y"
 
 λp1, λp2 :: Λ
 λp1 = λ "p" --> "p" $$ (λ "x" "y" --> "x")

@@ -1,5 +1,7 @@
 \begin{code}
 
+{-# LANGUAGE TypeFamilies #-}
+
 {-
 
 Basic machinery for an untyped lambda calculus. The main data type Λ represents
@@ -19,139 +21,127 @@ more readable than {Λ "x" (Λ "y" (App (Var "x") (Var "y")))}.
 -}
 
 -- Define module, list exports
-module Lambda (
+module UntypedLambda (
     Λ, Lambda,
-    λ, l, (-->), ($$),
-    prettyΛ, prettyLambda, showΛ, showLambda,
-    freeVariables, substitute,
-    isNormalForm, βReductions, betaReductions, normalForm, (===)
+    λ, l, (-->), ($$)
 ) where
 
 -- Imports
 import Data.Set (Set, delete, union, singleton)
+import Lambda
+import Data.Maybe (isJust, fromJust)
 
 -- Main defintions of lambda terms
-type Variable = String
-data Λ = Var Variable | Λ Variable Λ | App Λ Λ
+type ΛVariable = String
+data Λ = Var ΛVariable | Λ ΛVariable Λ | App Λ Λ
     deriving (Show)
 type Lambda = Λ
 
--- Defining the α-equivalence between pre-terms
-type EquivalenceContext = [(Variable, Variable)]
+instance ΛCalculus Λ where
+    type VariableName Λ = ΛVariable
+    type Variable Λ = ΛVariable
 
-αEquiv :: Λ -> Λ -> EquivalenceContext -> Bool
-αEquiv (Var x) (Var y) context = x == y || (x, y) `elem` context
-αEquiv (Λ x xTerm) (Λ y yTerm) context = canSubstitute && αEquiv xTerm yTerm ((x, y) : context)
-  where
-    yInXTerm = y `elem` freeVariables xTerm
-    xInYTerm = x `elem` freeVariables yTerm
-    canSubstitute = not yInXTerm && not xInYTerm
+    fromVar = Var
+    fromVarName = Var
+    fromΛ = Λ
+    fromApp = App
 
-αEquiv (App x1 x2) (App y1 y2) context = αEquiv x1 y1 context && αEquiv x2 y2 context
-αEquiv _ _ _ = False
+    -- Pretty printing
+    prettyΛ :: Λ -> String
+    prettyΛ (Var x) = x
+    prettyΛ (Λ x term@(Λ _ _)) = "λ" ++ x ++ tail (prettyΛ term)
+    prettyΛ (Λ x term) = "λ" ++ x ++ "." ++ prettyΛ term
+    prettyΛ (App x@(Λ _ _) y@(Var _)) = "(" ++ prettyΛ x ++ ")" ++ prettyΛ y
+    prettyΛ (App x@(Λ _ _) y) = "(" ++ prettyΛ x ++ ")(" ++ prettyΛ y ++ ")"
+    prettyΛ (App x y@(Var _)) = prettyΛ x ++ prettyΛ y
+    prettyΛ (App x y) = prettyΛ x ++ "(" ++ prettyΛ y ++ ")"
 
-instance Eq Λ where
-  x == y = αEquiv x y []
+    showΛ :: Λ -> IO ()
+    showΛ = putStrLn . prettyΛ
+
+    -- Determining the set of free variables
+    freeVariables :: Λ -> Set ΛVariable
+    freeVariables (Var x) = singleton x
+    freeVariables (Λ x term) = delete x $ freeVariables term
+    freeVariables (App x y) = freeVariables x `union` freeVariables y
+
+    -- Defining the α-equivalence between pre-terms
+    αEquiv :: Λ -> Λ -> [(ΛVariable, ΛVariable)] -> Bool
+    αEquiv (Var x) (Var y) context = x == y || (x, y) `elem` context
+    αEquiv (Λ x xTerm) (Λ y yTerm) context = notCrossBound && αEquiv xTerm yTerm ((x, y) : context)
+        where
+            yFreeInX = y `elem` freeVariables xTerm
+            xFreeInY = x `elem` freeVariables yTerm
+            notCrossBound = x == y || not yFreeInX && not xFreeInY
+
+    αEquiv (App x1 x2) (App y1 y2) context = αEquiv x1 y1 context && αEquiv x2 y2 context
+    αEquiv _ _ _ = False
+
+    -- Performing a substitution
+    renameVariable :: Λ -> VariableName Λ -> VariableName Λ -> Λ
+    renameVariable (Var x) old new
+        | x == old = Var new
+        | otherwise = Var x
+    renameVariable (Λ x term) old new
+        | x == old = Λ new $ renameVariable term old new
+        | otherwise = Λ x $ renameVariable term old new
+    renameVariable (App x y) old new = App (renameVariable x old new) (renameVariable y old new)
+
+    prepareSubstitution :: Λ -> VariableName Λ -> Λ
+    prepareSubstitution (Λ x term) var
+        | x /= var  = Λ x $ prepareSubstitution term var
+        | otherwise = Λ newName $ prepareSubstitution (renameVariable term x newName) var
+        where newName = "_" ++ x
+    prepareSubstitution (App x y) var = App (prepareSubstitution x var) (prepareSubstitution y var)
+    prepareSubstitution var _ = var
+
+    performSubstitute :: Λ -> Variable Λ -> Λ -> Maybe Λ
+    performSubstitute (Var x) var term
+        | x == var = Just term
+        | otherwise = Just $ Var x
+    performSubstitute (Λ x t) var term
+        | x == var = Just $ Λ x t
+        | otherwise = Λ x <$> performSubstitute t var term
+    performSubstitute (App x y) var term = App <$> performSubstitute x var term <*> performSubstitute y var term
+
+    -- Perform one of each possible β-redex in the lambda term
+    βReductions :: Λ -> [Λ]
+    βReductions (App (Λ x term) n) = [fromJust substitution | isJust substitution] ++ reduceTerm ++ reduceApp
+        where
+            reduceTerm = (\newTerm -> App (Λ x newTerm) n) <$> βReductions term
+            reduceApp = App (Λ x term) <$> βReductions n
+            substitution = substitute term x n
+    βReductions (Var _) = []
+    βReductions (Λ x term) = Λ x <$> βReductions term
+    βReductions (App x y) = ((`App` y) <$> βReductions x) ++ (App x <$> βReductions y)
 
 -- Helper functions for notation
-class ΛParams a where
-  toΛparams :: [Variable] -> a
+class ΛParameters a where
+    toΛparameters :: [ΛVariable] -> a
 
-instance ΛParams (Λ -> Λ) where
-  toΛparams [] = error "No Λ parameters supplied"
-  toΛparams [x] = Λ x
-  toΛparams (x:xs) = Λ x . toΛparams xs
+instance ΛParameters (Λ -> Λ) where
+    toΛparameters [] = error "No Λ-parameters supplied"
+    toΛparameters xs = \λbody -> foldr fromΛ λbody xs
 
-instance (ΛParams a) => ΛParams (Variable -> a) where
-  toΛparams xs x = toΛparams (xs ++ [x])
+instance (ΛParameters a) => ΛParameters (ΛVariable -> a) where
+    toΛparameters xs x = toΛparameters (xs ++ [x])
 
-λ,l :: ΛParams a => a
-λ = toΛparams []
+λ,l :: ΛParameters a => a
 l = λ
+λ = toΛparameters []
 
-class Λable a where
-  toΛ :: a -> Λ
+class ΛTerm a where
+    toΛ :: a -> Λ
 
-instance Λable Λ where toΛ = id
-instance Λable String where toΛ = Var
+instance ΛTerm Λ where toΛ = id
+instance ΛTerm ΛVariable where toΛ = fromVarName
 
-(-->) :: Λable a => (Λ -> Λ) -> a -> Λ
+(-->) :: (ΛTerm a) => (Λ -> Λ) -> a -> Λ
 a --> b = a (toΛ b)
 infixr 6 -->
 
-($$) :: (Λable a, Λable b) => a -> b -> Λ
-x $$ y = App (toΛ x) (toΛ y)
+($$) :: (ΛTerm a, ΛTerm b) => a -> b -> Λ
+x $$ y = fromApp (toΛ x) (toΛ y)
 infixl 7 $$
-
--- Pretty printing
-prettyΛ, prettyLambda :: Λ -> String
-prettyLambda = prettyΛ
-prettyΛ (Var x) = x
-prettyΛ (Λ x term@(Λ _ _)) = "λ" ++ x ++ tail (prettyΛ term)
-prettyΛ (Λ x term) = "λ" ++ x ++ "." ++ prettyΛ term
-prettyΛ (App x@(Λ _ _) y@(Var _)) = "(" ++ prettyΛ x ++ ")" ++ prettyΛ y
-prettyΛ (App x@(Λ _ _) y) = "(" ++ prettyΛ x ++ ")(" ++ prettyΛ y ++ ")"
-prettyΛ (App x y@(Var _)) = prettyΛ x ++ prettyΛ y
-prettyΛ (App x y) = prettyΛ x ++ "(" ++ prettyΛ y ++ ")"
-
-showΛ, showLambda :: Λ -> IO ()
-showLambda = showΛ
-showΛ = putStrLn . prettyΛ
-
--- Determining the set of free variables
-freeVariables :: Λ -> Set Variable
-freeVariables (Var x) = singleton x
-freeVariables (Λ x term) = delete x $ freeVariables term
-freeVariables (App x y) = freeVariables x `union` freeVariables y
-
--- Performing a substitution
-substitute :: Λ -> Variable -> Λ -> Λ
-substitute (Var x) var term
-                            | x == var = term
-                            | otherwise = Var x
-substitute (Λ x t) var term
-                            | x == var = Λ x t
-                            | otherwise = Λ x (substitute t var term)
-substitute (App x y) var term = App (substitute x var term) (substitute y var term)
-
--- Finding whether there are any β-redexes
-hasβRedex :: Λ -> Bool
-hasβRedex (App (Λ _ _) _) = True
-hasβRedex (Var _) = False
-hasβRedex (Λ _ term) = hasβRedex term
-hasβRedex (App x y) = hasβRedex x || hasβRedex y
-
-isNormalForm :: Λ -> Bool
-isNormalForm = not . hasβRedex
-
--- Perform one of each possible β-redex in the lambda term
-βReductions, betaReductions :: Λ -> [Λ]
-betaReductions = βReductions
-βReductions (App (Λ x term) n) = [substitute term x n] ++ reduceTerm ++ reduceApp
-    where
-        reduceTerm = (\newTerm -> App (Λ x newTerm) n) <$> βReductions term
-        reduceApp = App (Λ x term) <$> βReductions n
-βReductions (Var _) = []
-βReductions (Λ x term) = Λ x <$> βReductions term
-βReductions (App x y) = ((`App` y) <$> βReductions x) ++ (App x <$> βReductions y)
-
--- Performing only the leftmost redex to try and find the normal form - if it exists
-βReduceLeft :: Λ -> Λ
-βReduceLeft t
- | hasβRedex t = head $ βReductions t
- | otherwise = error "The λ-term is already in normal form!"
-
-normalForm :: Λ -> Λ
-normalForm t
- | isNormalForm t = t
- | otherwise = (normalForm . βReduceLeft) t
-
--- Rudimentary β-equivalence relation.
--- It is complete for terms with a normal form - but without a normal form we will
--- need a more sophisticated algorithm that would do some kind of search through all
--- possible reduction paths.
-(===) :: Λ -> Λ -> Bool
-x === y = x == y || normalForm x == normalForm y
-infix 1 ===
 
 \end{code}
